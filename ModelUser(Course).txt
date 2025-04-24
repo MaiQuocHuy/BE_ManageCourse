@@ -1,0 +1,89 @@
+1. Danh sách nghiệp vụ (Business Requirements)
+Dựa trên User Model và các phương thức được mô tả trong tài liệu (createUser, getUserById, getUserByEmail, updateUser, deleteUser, getAllUsers, changePassword, verifyPassword, addUserRole, removeUserRole, getUserRoles), các nghiệp vụ cần thực hiện bao gồm:
+
+Đăng ký người dùng (Registration):
+Cho phép người dùng mới tạo tài khoản với thông tin cơ bản (name, email, password).
+Gán vai trò mặc định (thường là student).
+Trả về JWT token để sử dụng ngay sau khi đăng ký.
+Đăng nhập người dùng (Login):
+Xác thực người dùng dựa trên email và password.
+Tạo và trả về access token (JWT) và refresh token.
+Lưu refresh token vào bảng refresh_tokens để duy trì phiên đăng nhập.
+Đăng xuất người dùng (Logout):
+Vô hiệu hóa refresh token để kết thúc phiên đăng nhập.
+Đảm bảo người dùng không thể sử dụng refresh token đã bị thu hồi.
+Lấy thông tin người dùng (Get User Info):
+Lấy thông tin cá nhân của người dùng hiện tại hoặc người dùng khác (dựa trên ID).
+Chỉ admin hoặc chính người dùng được phép truy cập.
+Cập nhật thông tin người dùng (Update User):
+Cập nhật thông tin như tên, bio, hoặc ảnh đại diện.
+Hỗ trợ upload ảnh đại diện lên cloud (Cloudinary, AWS S3).
+Đổi mật khẩu (Change Password):
+Cho phép người dùng đổi mật khẩu sau khi xác thực mật khẩu cũ.
+Vô hiệu hóa tất cả refresh token hiện tại để bảo mật.
+Quản lý vai trò (Manage Roles):
+Thêm hoặc xóa vai trò (student, instructor, admin) cho người dùng.
+Chỉ admin được phép thực hiện thay đổi vai trò.
+Lấy danh sách người dùng (List Users):
+Lấy danh sách tất cả người dùng với phân trang và lọc (ví dụ: theo vai trò).
+Chỉ admin được phép truy cập.
+Xóa người dùng (Delete User):
+Xóa tài khoản người dùng và các dữ liệu liên quan (vai trò, refresh token).
+Chỉ admin hoặc chính người dùng được phép.
+2. Tech Stack
+Để triển khai các API này, tôi đề xuất tech stack sau:
+
+Backend:
+Ngôn ngữ: TypeScript với Node.js (đảm bảo type safety và dễ bảo trì).
+Framework: Express.js (nhẹ, linh hoạt, phổ biến cho REST API).
+ORM/Database Driver:
+TypeORM để quản lý truy vấn MySQL.
+mysql2 cho kết nối MySQL.
+Authentication:
+jsonwebtoken: Tạo và xác thực JWT.
+bcrypt: Hash mật khẩu.
+Validation:
+Joi hoặc zod: Kiểm tra dữ liệu đầu vào.
+File Upload:
+Cloudinary ể lưu ảnh đại diện.
+multer: Xử lý upload file trong Express.
+Database:
+MySQL: Dựa trên schema đã cung cấp (users, user_roles, refresh_tokens).
+
+Dưới đây là danh sách các API cho User Model, bao gồm endpoint, phương thức HTTP, mô tả, yêu cầu xác thực, và các lưu ý tối ưu hóa.
+
+Endpoint	Method	Description	Auth	Notes
+/api/users/register	POST	Đăng ký người dùng mới	None	Hash mật khẩu, trả về JWT.
+/api/users/login	POST	Đăng nhập, trả về JWT và refresh token	None	Lưu refresh token, giới hạn số lần thử.
+/api/users/logout	POST	Đăng xuất, vô hiệu hóa refresh token	JWT	Kiểm tra refresh token hợp lệ.
+/api/users/me	GET	Lấy thông tin người dùng hiện tại	JWT	Cache thông tin bằng Redis.
+/api/users/:id	GET	Lấy thông tin người dùng theo ID	JWT (Admin hoặc chính user)	Kiểm tra quyền truy cập.
+/api/users/:id	PUT	Cập nhật thông tin người dùng	JWT	Upload ảnh đại diện lên Cloudinary.
+/api/users/:id/password	PUT	Đổi mật khẩu	JWT	Vô hiệu hóa tất cả refresh token.
+/api/users/:id/roles	POST	Thêm vai trò cho người dùng	JWT (Admin)	Kiểm tra quyền admin.
+/api/users/:id/roles	DELETE	Xóa vai trò của người dùng	JWT (Admin)	Đảm bảo ít nhất một vai trò.
+/api/users	GET	Lấy danh sách người dùng (phân trang)	JWT (Admin)	Sử dụng index trên email, hỗ trợ lọc.
+/api/users/:id	DELETE	Xóa người dùng	JWT (Admin hoặc chính user)	Xóa dữ liệu liên quan (roles, tokens).
+4. Các bước triển khai chi tiết
+4.1. Đăng ký người dùng (/api/users/register)
+4.2. Đăng nhập người dùng (/api/users/login)
+4.3. Đăng xuất người dùng (/api/users/logout)
+4.4. Lấy thông tin người dùng hiện tại (/api/users/me)
+4.5. Cập nhật thông tin người dùng (/api/users/:id)
+4.6. Đổi mật khẩu (/api/users/:id/password)
+4.7. Quản lý vai trò (/api/users/:id/roles)
+4.8. Lấy danh sách người dùng (/api/users)
+4.9. Xóa người dùng (/api/users/:id)
+5. Nguyên tắc thiết kế cấu trúc dự án
+Modularity: Tách biệt các thành phần (routes, controllers, services, models) để dễ bảo trì.
+Scalability: Cấu trúc hỗ trợ thêm model và tính năng mới mà không làm rối codebase.
+Separation of Concerns: Mỗi lớp (layer) xử lý một trách nhiệm cụ thể (routes định tuyến, controllers xử lý logic HTTP, services xử lý logic nghiệp vụ, models tương tác với database).
+Reusability: Các thành phần như middleware, utilities được tái sử dụng.
+Testing: Hỗ trợ viết unit test và integration test dễ dàng.
+Configuration: Tách biệt cấu hình môi trường (development, production) để dễ triển khai.
+6.Nguyên tắc khi kết hợp Swagger
+Mục tiêu: Swagger (OpenAPI Specification) phải phản ánh chính xác các endpoint, request/response schema, và trạng thái của API.
+Nguyên tắc:
+Tự động hóa tài liệu: Sử dụng các thư viện như swagger-jsdoc hoặc swagger-ui-express để tạo tài liệu Swagger trực tiếp từ mã nguồn (comments JSDoc trong Express.js).
+Đồng bộ hóa với mã: Đảm bảo mọi thay đổi trong API (thêm endpoint, cập nhật schema) được phản ánh ngay lập tức trong tài liệu Swagger.
+Xác thực schema: Sử dụng các công cụ như express-openapi-validator để kiểm tra tính hợp lệ của request/response so với định nghĩa trong Swagger.
