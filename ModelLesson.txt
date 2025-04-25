@@ -1,0 +1,240 @@
+1. Danh sách nghiệp vụ (Business Requirements)
+Dựa trên Lesson Model và các phương thức được mô tả trong tài liệu (createLesson, getLessonById, getLessonsBySection, updateLesson, deleteLesson, reorderLessons, markLessonCompleted, isLessonCompleted, getCompletedLessons, getCourseCompletionPercentage, getNextLesson), các nghiệp vụ cần thực hiện bao gồm:
+
+- Tạo bài học mới (Create Lesson):
+  - Cho phép giảng viên tạo bài học mới trong một section với thông tin cơ bản (section_id, title, type, content, duration, order_index, is_free).
+  - Chỉ giảng viên sở hữu khóa học hoặc admin được phép thực thi.
+
+- Lấy thông tin bài học (Get Lesson Info):
+  - Lấy thông tin bài học theo ID.
+  - Hỗ trợ truy cập bởi giảng viên, admin, hoặc học viên đã đăng ký khóa học (với kiểm tra is_free hoặc quyền truy cập).
+
+- Lấy danh sách bài học của section (Get Lessons by Section):
+  - Lấy tất cả bài học trong một section, sắp xếp theo order_index.
+  - Hỗ trợ truy cập bởi giảng viên, admin, hoặc học viên đã đăng ký khóa học.
+
+- Cập nhật bài học (Update Lesson):
+  - Cập nhật thông tin bài học như tiêu đề, nội dung, thời lượng, thứ tự hiển thị, hoặc trạng thái miễn phí.
+  - Chỉ giảng viên sở hữu khóa học hoặc admin được phép thực thi.
+
+- Xóa bài học (Delete Lesson):
+  - Xóa bài học và các hoàn thành bài học liên quan (lesson_completions).
+  - Chỉ giảng viên sở hữu khóa học hoặc admin được phép thực thi.
+
+- Sắp xếp lại bài học (Reorder Lessons):
+  - Thay đổi thứ tự hiển thị của các bài học trong một section.
+  - Chỉ giảng viên sở hữu khóa học hoặc admin được phép thực thi.
+
+- Đánh dấu bài học hoàn thành (Mark Lesson Completed):
+  - Ghi nhận rằng học viên đã hoàn thành một bài học.
+  - Yêu cầu học viên đã đăng ký khóa học và xác thực JWT.
+
+- Kiểm tra trạng thái hoàn thành bài học (Is Lesson Completed):
+  - Kiểm tra xem học viên đã hoàn thành một bài học cụ thể chưa.
+  - Yêu cầu học viên đã đăng ký khóa học và xác thực JWT.
+
+- Lấy danh sách bài học đã hoàn thành (Get Completed Lessons):
+  - Lấy danh sách bài học đã hoàn thành của học viên trong một khóa học.
+  - Yêu cầu học viên đã đăng ký khóa học và xác thực JWT.
+
+- Tính phần trăm hoàn thành khóa học (Get Course Completion Percentage):
+  - Tính tỷ lệ phần trăm bài học đã hoàn thành trong một khóa học cho học viên.
+  - Yêu cầu học viên đã đăng ký khóa học và xác thực JWT.
+
+- Lấy bài học tiếp theo (Get Next Lesson):
+  - Xác định bài học chưa hoàn thành tiếp theo trong khóa học cho học viên.
+  - Yêu cầu học viên đã đăng ký khóa học và xác thực JWT.
+
+2. Tech Stack
+Để triển khai các API này, tôi đề xuất tech stack sau, đồng bộ với User Model, Category Model, Course Model, và Section Model, không sử dụng Redis:
+
+- Backend:
+  - Ngôn ngữ: TypeScript với Node.js (đảm bảo type safety và dễ bảo trì).
+  - Framework: Express.js (nhẹ, linh hoạt, phổ biến cho REST API).
+  - ORM/Database Driver:
+    - Sequenlize để quản lý truy vấn MySQL.
+    - mysql2 cho kết nối MySQL.
+  - Validation:
+    - joi: Kiểm tra dữ liệu đầu vào.
+  - Authentication:
+    - jsonwebtoken: Tạo và xác thực JWT (cho các API yêu cầu admin/instructor/student).
+  - Documentation:
+    - swagger-jsdoc và swagger-ui-express: Tạo tài liệu OpenAPI.
+    - express-openapi-validator: Validate request/response theo spec.
+
+- Database:
+  - MySQL: Dựa trên schema đã cung cấp (lessons, lesson_completions).
+
+3. Danh sách API chi tiết
+Dưới đây là danh sách các API cho Lesson Model, bao gồm endpoint, phương thức HTTP, mô tả, yêu cầu xác thực, và các lưu ý tối ưu hóa.
+
+- Endpoint: /api/lessons
+  - Method: POST
+  - Description: Tạo bài học mới
+  - Auth: JWT (Instructor hoặc Admin)
+  - Notes: Kiểm tra quyền sở hữu khóa học.
+
+- Endpoint: /api/lessons/:id
+  - Method: GET
+  - Description: Lấy thông tin bài học theo ID
+  - Auth: JWT (Instructor, Admin, hoặc học viên đã đăng ký)
+  - Notes: Tối ưu bằng cách chọn cột cụ thể.
+
+- Endpoint: /api/lessons/section/:sectionId
+  - Method: GET
+  - Description: Lấy tất cả bài học của section
+  - Auth: JWT (Instructor, Admin, hoặc học viên đã đăng ký)
+  - Notes: Sắp xếp theo order_index, tối ưu bằng cách chọn cột cụ thể.
+
+- Endpoint: /api/lessons/:id
+  - Method: PUT
+  - Description: Cập nhật thông tin bài học
+  - Auth: JWT (Instructor hoặc Admin)
+  - Notes: Kiểm tra quyền sở hữu khóa học.
+
+- Endpoint: /api/lessons/:id
+  - Method: DELETE
+  - Description: Xóa bài học
+  - Auth: JWT (Instructor hoặc Admin)
+  - Notes: Xóa lesson_completions liên quan.
+
+- Endpoint: /api/lessons/reorder
+  - Method: PUT
+  - Description: Sắp xếp lại bài học
+  - Auth: JWT (Instructor hoặc Admin)
+  - Notes: Kiểm tra quyền sở hữu khóa học, cập nhật order_index.
+
+- Endpoint: /api/lessons/:id/complete
+  - Method: POST
+  - Description: Đánh dấu bài học hoàn thành
+  - Auth: JWT (Student)
+  - Notes: Kiểm tra học viên đã đăng ký khóa học.
+
+- Endpoint: /api/lessons/:id/completed
+  - Method: GET
+  - Description: Kiểm tra trạng thái hoàn thành bài học
+  - Auth: JWT (Student)
+  - Notes: Tối ưu bằng cách chọn cột cụ thể.
+
+- Endpoint: /api/lessons/course/:courseId/completed
+  - Method: GET
+  - Description: Lấy danh sách bài học đã hoàn thành
+  - Auth: JWT (Student)
+  - Notes: Tối ưu bằng cách chọn cột cụ thể.
+
+- Endpoint: /api/courses/:courseId/completion
+  - Method: GET
+  - Description: Tính phần trăm hoàn thành khóa học
+  - Auth: JWT (Student)
+  - Notes: Tối ưu bằng cách tính toán dựa trên lesson_completions.
+
+- Endpoint: /api/lessons/course/:courseId/next
+  - Method: GET
+  - Description: Lấy bài học tiếp theo chưa hoàn thành
+  - Auth: JWT (Student)
+  - Notes: Tối ưu bằng cách chọn cột cụ thể.
+
+4. Các bước triển khai chi tiết
+
+4.1. Tạo bài học mới (/api/lessons)
+- Input: { section_id, title, type, content, duration, order_index, is_free }.
+- Xử lý:
+  - Validate input bằng joi (section_id, title, type bắt buộc).
+  - Kiểm tra quyền sở hữu khóa học (instructor_id khớp với userId trong JWT).
+  - Thêm bản ghi vào bảng lessons (createLesson).
+- Output: { id, section_id, title, type, content, duration, order_index, is_free }.
+
+4.2. Lấy thông tin bài học (/api/lessons/:id)
+- Input: :id.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền (instructor, admin, hoặc học viên đã đăng ký khóa học).
+  - Nếu không phải is_free, kiểm tra học viên đã đăng ký khóa học.
+  - Truy vấn bảng lessons để lấy thông tin bài học (getLessonById).
+  - Chọn cột cụ thể để giảm tải xử lý.
+- Output: { id, section_id, title, type, content, duration, order_index, is_free }.
+
+4.3. Lấy danh sách bài học của section (/api/lessons/section/:sectionId)
+- Input: :sectionId.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền (instructor, admin, hoặc học viên đã đăng ký khóa học).
+  - Truy vấn bảng lessons để lấy tất cả bài học của section (getLessonsBySection).
+  - Sắp xếp theo order_index.
+  - Chọn cột cụ thể để giảm tải xử lý.
+- Output: { lessons: [{ id, section_id, title, type, content, duration, order_index, is_free }] }.
+
+4.4. Cập nhật bài học (/api/lessons/:id)
+- Input: { title, type, content, duration, order_index, is_free }.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền instructor/admin và quyền sở hữu khóa học.
+  - Validate input bằng joi.
+  - Cập nhật bản ghi trong bảng lessons (updateLesson).
+- Output: { id, section_id, title, type, content, duration, order_index, is_free }.
+
+4.5. Xóa bài học (/api/lessons/:id)
+- Input: :id.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền instructor/admin và quyền sở hữu khóa học.
+  - Xóa bản ghi trong bảng lessons (deleteLesson).
+  - Xóa các bản ghi liên quan trong bảng lesson_completions.
+- Output: { message: 'Lesson deleted successfully' }.
+
+4.6. Sắp xếp lại bài học (/api/lessons/reorder)
+- Input: { section_id, lessons: [{ id, order_index }] }.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền instructor/admin và quyền sở hữu khóa học.
+  - Validate input bằng joi.
+  - Cập nhật order_index của các bài học trong bảng lessons (reorderLessons).
+- Output: { message: 'Lessons reordered successfully' }.
+
+4.7. Đánh dấu bài học hoàn thành (/api/lessons/:id/complete)
+- Input: :id.
+- Xử lý:
+  - Xác thực JWT, kiểm tra học viên đã đăng ký khóa học.
+  - Thêm bản ghi vào bảng lesson_completions (markLessonCompleted).
+- Output: { message: 'Lesson marked as completed' }.
+
+4.8. Kiểm tra trạng thái hoàn thành bài học (/api/lessons/:id/completed)
+- Input: :id.
+- Xử lý:
+  - Xác thực JWT, kiểm tra học viên đã đăng ký khóa học.
+  - Truy vấn bảng lesson_completions để kiểm tra trạng thái (isLessonCompleted).
+  - Chọn cột cụ thể để giảm tải xử lý.
+- Output: { completed: boolean }.
+
+4.9. Lấy danh sách bài học đã hoàn thành (/api/lessons/course/:courseId/completed)
+- Input: :courseId.
+- Xử lý:
+  - Xác thực JWT, kiểm tra học viên đã đăng ký khóa học.
+  - Truy vấn bảng lesson_completions để lấy danh sách bài học đã hoàn thành (getCompletedLessons).
+  - Chọn cột cụ thể để giảm tải xử lý.
+- Output: { completed_lessons: [{ id, lesson_id, completed_at }] }.
+
+4.10. Tính phần trăm hoàn thành khóa học (/api/courses/:courseId/completion)
+- Input: :courseId.
+- Xử lý:
+  - Xác thực JWT, kiểm tra học viên đã đăng ký khóa học.
+  - Truy vấn bảng lessons và lesson_completions để tính tỷ lệ hoàn thành (getCourseCompletionPercentage).
+- Output: { completion_percentage: number }.
+
+4.11. Lấy bài học tiếp theo (/api/lessons/course/:courseId/next)
+- Input: :courseId.
+- Xử lý:
+  - Xác thực JWT, kiểm tra học viên đã đăng ký khóa học.
+  - Truy vấn bảng lessons và lesson_completions để xác định bài học chưa hoàn thành tiếp theo (getNextLesson).
+  - Chọn cột cụ thể để giảm tải xử lý.
+- Output: { id, section_id, title, type, content, duration, order_index, is_free }.
+
+5. Nguyên tắc thiết kế cấu trúc dự án
+
+- Modularity: Tách biệt các thành phần (routes, controllers, services, models) để dễ bảo trì.
+- Scalability: Cấu trúc hỗ trợ thêm model và tính năng mới mà không làm rối codebase.
+- Separation of Concerns: Mỗi lớp (layer) xử lý một trách nhiệm cụ thể (routes định tuyến, controllers xử lý logic HTTP, services xử lý logic nghiệp vụ, models tương tác với database).
+- Reusability: Các thành phần như middleware, utilities được tái sử dụng.
+
+6. Nguyên tắc khi kết hợp Swagger
+
+- Mục tiêu: Swagger (OpenAPI Specification) phải phản ánh chính xác các endpoint, request/response schema, và trạng thái của API.
+- Nguyên tắc:
+  - Tự động hóa tài liệu: Sử dụng các thư viện như swagger-jsdoc hoặc swagger-ui-express để tạo tài liệu Swagger trực tiếp từ mã nguồn (comments JSDoc trong Express.js).
+  - Đồng bộ hóa với mã: Đảm bảo mọi thay đổi trong API (thêm endpoint, cập nhật schema) được phản ánh ngay lập tức trong tài liệu Swagger.
+  - Xác thực schema: Sử dụng các công cụ như express-openapi-validator để kiểm tra tính hợp lệ của request/response so với định nghĩa trong Swagger.

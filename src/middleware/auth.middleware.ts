@@ -24,7 +24,7 @@ export const authenticate = async (
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
-
+    console.log("Body", req.body);
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       throw new ApiError(401, "Authentication required");
     }

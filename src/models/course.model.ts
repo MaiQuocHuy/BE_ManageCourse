@@ -64,6 +64,13 @@ class Course
       otherKey: "category_id",
       as: "categories",
     });
+
+    // One-to-many relationship with Section
+    Course.hasMany(models.Section, {
+      foreignKey: "course_id",
+      as: "sections",
+      onDelete: "CASCADE",
+    });
   }
 }
 

@@ -3,7 +3,7 @@ import CourseCategory from "../models/course-category.model";
 import Category from "../models/category.model";
 import User from "../models/user.model";
 import { ApiError } from "../utils/api-error";
-import { Includeable, Op } from "sequelize";
+import { Op } from "sequelize";
 import sequelize from "../config/database";
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
@@ -555,7 +555,6 @@ class CourseService {
   /**
    * Search courses by keyword
    */
-
   async searchCourses(
     options: SearchOptions
   ): Promise<{ courses: Course[]; total: number }> {
@@ -568,65 +567,33 @@ class CourseService {
     } = options;
     const offset = (page - 1) * limit;
 
-    // Base where clause
+    // Build where clause
     const whereClause: any = {
       is_published,
       is_approved: true,
+      [Op.or]: [
+        { title: { [Op.like]: `%${keyword}%` } },
+        { description: { [Op.like]: `%${keyword}%` } },
+      ],
     };
 
-    // Add search condition only if keyword exists
-    if (keyword && keyword.trim()) {
-      const searchTerms = keyword
-        .trim()
-        .toLowerCase()
-        .split(/[\s-]+/) // Tách theo khoảng trắng và dấu gạch ngang
-        .filter((term) => term.length >= 2) // Lọc từ ngắn
-        .map((term) => {
-          // Xử lý các trường hợp đặc biệt
-          if (term === "be" || term === "backend" || term.includes("back")) {
-            return ["backend", "be", "back end", "back-end"];
-          }
-          return [term];
-        })
-        .flat(); // Làm phẳng mảng
-
-      if (searchTerms.length > 0) {
-        whereClause[Op.or] = searchTerms.map((term) => ({
-          [Op.or]: [
-            sequelize.where(
-              sequelize.fn("LOWER", sequelize.col("Course.title")),
-              Op.like,
-              `%${term}%`
-            ),
-            sequelize.where(
-              sequelize.fn("LOWER", sequelize.col("Course.description")),
-              Op.like,
-              `%${term}%`
-            ),
-          ],
-        }));
-      }
-    }
-
-    // Include options for related models
-    const includeOptions: Includeable[] = [
-      {
-        model: Category,
-        as: "categories",
-        through: { attributes: [] },
-        ...(category_id && { where: { id: category_id } }),
-      },
-      {
-        model: User,
-        as: "instructor",
-        attributes: ["id", "name", "email", "profile_thumbnail"],
-      },
-    ];
-
-    try {
+    // If category_id is provided, we need to filter by category
+    if (category_id) {
       const { count, rows } = await Course.findAndCountAll({
         where: whereClause,
-        include: includeOptions,
+        include: [
+          {
+            model: Category,
+            as: "categories",
+            through: { attributes: [] },
+            where: { id: category_id },
+          },
+          {
+            model: User,
+            as: "instructor",
+            attributes: ["id", "name", "email", "profile_thumbnail"],
+          },
+        ],
         limit,
         offset,
         order: [["created_at", "DESC"]],
@@ -637,11 +604,35 @@ class CourseService {
         courses: rows,
         total: count,
       };
-    } catch (error) {
-      console.error("Search courses error:", error);
-      throw new ApiError(500, "Error searching courses");
+    } else {
+      // If no category_id, just search all courses
+      const { count, rows } = await Course.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: Category,
+            as: "categories",
+            through: { attributes: [] },
+          },
+          {
+            model: User,
+            as: "instructor",
+            attributes: ["id", "name", "email", "profile_thumbnail"],
+          },
+        ],
+        limit,
+        offset,
+        order: [["created_at", "DESC"]],
+        distinct: true,
+      });
+
+      return {
+        courses: rows,
+        total: count,
+      };
     }
   }
+
   /**
    * Get recommended courses for a user
    * This is a simple implementation that could be enhanced with more sophisticated recommendation algorithms

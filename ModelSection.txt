@@ -1,0 +1,152 @@
+  1. Danh sách nghiệp vụ (Business Requirements)
+Dựa trên Section Model và các phương thức được mô tả trong tài liệu (createSection, getCourseSections, getSectionById, updateSection, deleteSection, reorderSections), các nghiệp vụ cần thực hiện bao gồm:
+
+- Tạo section mới (Create Section):
+  - Cho phép giảng viên tạo section mới trong một khóa học với thông tin cơ bản (title, description, order_index, course_id).
+  - Chỉ giảng viên sở hữu khóa học hoặc admin được phép thực thi.
+
+- Lấy thông tin section (Get Section Info):
+  - Lấy thông tin section theo ID.
+  - Hỗ trợ truy cập bởi giảng viên, admin, hoặc học viên đã đăng ký khóa học.
+
+- Lấy danh sách section của khóa học (Get Course Sections):
+  - Lấy tất cả section của một khóa học, sắp xếp theo order_index.
+  - Hỗ trợ truy cập bởi giảng viên, admin, hoặc học viên đã đăng ký khóa học.
+
+- Cập nhật section (Update Section):
+  - Cập nhật thông tin section như tiêu đề, mô tả, hoặc thứ tự hiển thị.
+  - Chỉ giảng viên sở hữu khóa học hoặc admin được phép thực thi.
+
+- Xóa section (Delete Section):
+  - Xóa section và các lesson liên quan.
+  - Chỉ giảng viên sở hữu khóa học hoặc admin được phép thực thi.
+
+- Sắp xếp lại section (Reorder Sections):
+  - Thay đổi thứ tự hiển thị của các section trong một khóa học.
+  - Chỉ giảng viên sở hữu khóa học hoặc admin được phép thực thi.
+
+2. Tech Stack
+Để triển khai các API này, tôi đề xuất tech stack sau, đồng bộ với User Model, Category Model, và Course Model, không sử dụng Redis:
+
+- Backend:
+  - Ngôn ngữ: TypeScript với Node.js (đảm bảo type safety và dễ bảo trì).
+  - Framework: Express.js (nhẹ, linh hoạt, phổ biến cho REST API).
+  - ORM/Database Driver:
+    - sequenlize để quản lý truy vấn MySQL.
+    - mysql2 cho kết nối MySQL.
+  - Validation:
+    - joi: Kiểm tra dữ liệu đầu vào.
+  - Authentication:
+    - jsonwebtoken: Tạo và xác thực JWT (cho các API yêu cầu admin/instructor).
+  - Documentation:
+    - swagger-jsdoc và swagger-ui-express: Tạo tài liệu OpenAPI.
+    - express-openapi-validator: Validate request/response theo spec.
+
+- Database:
+  - MySQL: Dựa trên schema đã cung cấp (course_sections).
+
+3. Danh sách API chi tiết
+Dưới đây là danh sách các API cho Section Model, bao gồm endpoint, phương thức HTTP, mô tả, yêu cầu xác thực, và các lưu ý tối ưu hóa.
+
+- Endpoint: /api/sections
+  - Method: POST
+  - Description: Tạo section mới
+  - Auth: JWT (Instructor hoặc Admin)
+  - Notes: Kiểm tra quyền sở hữu khóa học.
+
+- Endpoint: /api/sections/:id
+  - Method: GET
+  - Description: Lấy thông tin section theo ID
+  - Auth: JWT (Instructor, Admin, hoặc học viên đã đăng ký)
+  - Notes: Tối ưu bằng cách chọn cột cụ thể.
+
+- Endpoint: /api/sections/course/:courseId
+  - Method: GET
+  - Description: Lấy tất cả section của khóa học
+  - Auth: JWT (Instructor, Admin, hoặc học viên đã đăng ký)
+  - Notes: Sắp xếp theo order_index, tối ưu bằng cách chọn cột cụ thể.
+
+- Endpoint: /api/sections/:id
+  - Method: PUT
+  - Description: Cập nhật thông tin section
+  - Auth: JWT (Instructor hoặc Admin)
+  - Notes: Kiểm tra quyền sở hữu khóa học.
+
+- Endpoint: /api/sections/:id
+  - Method: DELETE
+  - Description: Xóa section
+  - Auth: JWT (Instructor hoặc Admin)
+  - Notes: Xóa lesson liên quan.
+
+- Endpoint: /api/sections/reorder
+  - Method: PUT
+  - Description: Sắp xếp lại section
+  - Auth: JWT (Instructor hoặc Admin)
+  - Notes: Kiểm tra quyền sở hữu khóa học, cập nhật order_index.
+
+4. Các bước triển khai chi tiết
+
+4.1. Tạo section mới (/api/sections)
+- Input: { course_id, title, description, order_index }.
+- Xử lý:
+  - Validate input bằng joi (course_id, title bắt buộc).
+  - Kiểm tra quyền sở hữu khóa học (instructor_id khớp với userId trong JWT).
+  - Thêm bản ghi vào bảng course_sections (createSection).
+- Output: { id, course_id, title, description, order_index }.
+
+4.2. Lấy thông tin section (/api/sections/:id)
+- Input: :id.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền (instructor, admin, hoặc học viên đã đăng ký khóa học).
+  - Truy vấn bảng course_sections để lấy thông tin section (getSectionById).
+  - Chọn cột cụ thể để giảm tải xử lý.
+- Output: { id, course_id, title, description, order_index }.
+
+4.3. Lấy danh sách section của khóa học (/api/sections/course/:courseId)
+- Input: :courseId.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền (instructor, admin, hoặc học viên đã đăng ký khóa học).
+  - Truy vấn bảng course_sections để lấy tất cả section của khóa học (getCourseSections).
+  - Sắp xếp theo order_index.
+  - Chọn cột cụ thể để giảm tải xử lý.
+- Output: { sections: [{ id, course_id, title, description, order_index }] }.
+
+4.4. Cập nhật section (/api/sections/:id)
+- Input: { title, description, order_index }.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền instructor/admin và quyền sở hữu khóa học.
+  - Validate input bằng joi.
+  - Cập nhật bản ghi trong bảng course_sections (updateSection).
+- Output: { id, course_id, title, description, order_index }.
+
+4.5. Xóa section (/api/sections/:id)
+- Input: :id.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền instructor/admin và quyền sở hữu khóa học.
+  - Xóa bản ghi trong bảng course_sections (deleteSection).
+  - Xóa các lesson liên quan trong bảng lessons.
+- Output: { message: 'Section deleted successfully' }.
+
+4.6. Sắp xếp lại section (/api/sections/reorder)
+- Input: { course_id, sections: [{ id, order_index }] }.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền instructor/admin và quyền sở hữu khóa học.
+  - Validate input bằng joi.
+  - Cập nhật order_index của các section trong bảng course_sections (reorderSections).
+- Output: { message: 'Sections reordered successfully' }.
+
+5. Nguyên tắc thiết kế cấu trúc dự án
+
+- Modularity: Tách biệt các thành phần (routes, controllers, services, models) để dễ bảo trì.
+- Scalability: Cấu trúc hỗ trợ thêm model và tính năng mới mà không làm rối codebase.
+- Separation of Concerns: Mỗi lớp (layer) xử lý một trách nhiệm cụ thể (routes định tuyến, controllers xử lý logic HTTP, services xử lý logic nghiệp vụ, models tương tác với database).
+- Reusability: Các thành phần như middleware, utilities được tái sử dụng.
+- Testing: Hỗ trợ viết unit test và integration test dễ dàng.
+- Configuration: Tách biệt cấu hình môi trường (development, production) để dễ triển khai.
+
+6. Nguyên tắc khi kết hợp Swagger
+
+- Mục tiêu: Swagger (OpenAPI Specification) phải phản ánh chính xác các endpoint, request/response schema, và trạng thái của API.
+- Nguyên tắc:
+  - Tự động hóa tài liệu: Sử dụng các thư viện như swagger-jsdoc hoặc swagger-ui-express để tạo tài liệu Swagger trực tiếp từ mã nguồn (comments JSDoc trong Express.js).
+  - Đồng bộ hóa với mã: Đảm bảo mọi thay đổi trong API (thêm endpoint, cập nhật schema) được phản ánh ngay lập tức trong tài liệu Swagger.

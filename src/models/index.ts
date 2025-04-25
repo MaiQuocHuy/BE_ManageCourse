@@ -6,6 +6,9 @@ import RefreshToken from "./refresh-token.model";
 import Category from "./category.model";
 import Course from "./course.model";
 import CourseCategory from "./course-category.model";
+import Section from "./section.model";
+import Lesson from "./lesson.model";
+import LessonCompletion from "./lesson-completion.model";
 
 // Load environment variables
 config();
@@ -21,6 +24,9 @@ const models = {
   Category,
   Course,
   CourseCategory,
+  Section,
+  Lesson,
+  LessonCompletion,
 };
 
 // Set up associations

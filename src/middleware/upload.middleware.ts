@@ -1,29 +1,59 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { Request } from "express";
 import { ApiError } from "../utils/api-error";
 
-const uploadPath = path.join(__dirname, "..", "..", "uploads"); // Adjust depending on project structure
+// Base upload path
+const baseUploadPath = path.join(__dirname, "..", "..", "uploads");
 
-// Create the directory if it doesn't exist
-if (!fs.existsSync(uploadPath)) {
-  fs.mkdirSync(uploadPath, { recursive: true });
-}
+// Create the directories if they don't exist
+const createUploadDirectories = () => {
+  const directories = [
+    path.join(baseUploadPath, "images"),
+    path.join(baseUploadPath, "videos"),
+    path.join(baseUploadPath, "temp"),
+  ];
 
-// Configure storage
-const storage = multer.diskStorage({
+  directories.forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  });
+};
+
+// Create upload directories on startup
+createUploadDirectories();
+
+// Configure storage for images
+const imageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadPath);
+    const uploadDir = path.join(baseUploadPath, "images");
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    const ext = path.extname(file.originalname);
+    cb(null, `image-${uniqueSuffix}${ext}`);
   },
 });
 
-// File filter
-const fileFilter = (
-  req: any,
+// Configure storage for videos (temporary storage before Cloudinary upload)
+const videoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(baseUploadPath, "temp");
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    cb(null, `video-${uniqueSuffix}${ext}`);
+  },
+});
+
+// File filter for images
+const imageFilter = (
+  req: Request,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) => {
@@ -33,11 +63,47 @@ const fileFilter = (
   cb(null, true);
 };
 
-// Export the configured multer instance
-export const upload = multer({
-  storage: storage,
+// File filter for videos
+const videoFilter = (
+  req: Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
+  // Accept only video files
+  const allowedMimeTypes = [
+    "video/mp4",
+    "video/webm",
+    "video/ogg",
+    "video/quicktime",
+    "video/x-msvideo",
+    "video/x-flv",
+    "video/x-matroska",
+  ];
+
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new ApiError(400, "Only video files are allowed"));
+  }
+};
+
+// Create multer upload instance for images
+export const imageUpload = multer({
+  storage: imageStorage,
+  fileFilter: imageFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB max file size
   },
-  fileFilter: fileFilter,
 });
+
+// Create multer upload instance for videos
+export const videoUpload = multer({
+  storage: videoStorage,
+  fileFilter: videoFilter,
+  limits: {
+    fileSize: 500 * 1024 * 1024, // 500MB max file size for videos
+  },
+});
+
+// For backward compatibility
+export const upload = imageUpload;

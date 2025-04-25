@@ -115,6 +115,34 @@ router.post(
  */
 router.get("/", validateRequest(getCoursesSchema), courseController.getCourses);
 
+// Get a course by ID
+/**
+ * @swagger
+ * /api/courses/{id}:
+ *   get:
+ *     summary: Get a course by ID
+ *     tags: [Courses]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Course ID
+ *     responses:
+ *       200:
+ *         description: Course details
+ *       404:
+ *         description: Course not found
+ *       500:
+ *         description: Server error
+ */
+router.get(
+  "/:id",
+  validateRequest(getCourseSchema),
+  courseController.getCourseById
+);
+
 // Update a course (instructor only)
 /**
  * @swagger
@@ -492,34 +520,6 @@ router.get(
   authenticate,
   validateRequest(getRecommendedCoursesSchema),
   courseController.getRecommendedCourses
-);
-
-// Get a course by ID
-/**
- * @swagger
- * /api/courses/{id}:
- *   get:
- *     summary: Get a course by ID
- *     tags: [Courses]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Course ID
- *     responses:
- *       200:
- *         description: Course details
- *       404:
- *         description: Course not found
- *       500:
- *         description: Server error
- */
-router.get(
-  "/:id",
-  validateRequest(getCourseSchema),
-  courseController.getCourseById
 );
 
 export default router;
