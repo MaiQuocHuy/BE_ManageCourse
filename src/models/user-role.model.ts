@@ -62,7 +62,7 @@ UserRole.init(
 );
 
 // Define association
-User.hasMany(UserRole, { foreignKey: "user_id", as: "roles" });
+// Note: The User-UserRole association is defined in the User model's associate method
 UserRole.belongsTo(User, { foreignKey: "user_id" });
 
 export default UserRole;

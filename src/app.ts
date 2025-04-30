@@ -6,6 +6,7 @@ import categoryRoutes from "./routes/category.routes";
 import courseRoutes from "./routes/course.routes";
 import sectionRoutes from "./routes/section.routes";
 import lessonRoutes from "./routes/lesson.routes";
+import enrollmentRoutes from "./routes/enrollment.routes";
 import { errorHandler } from "./middleware/error.middleware";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
@@ -16,7 +17,7 @@ import "./models/index";
 config();
 
 const app = express();
-const port = process.env.PORT || 4321;
+const port = process.env.PORT || 4322;
 
 // Middleware
 app.use(morgan("dev"));
@@ -89,6 +90,7 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/sections", sectionRoutes);
 app.use("/api/lessons", lessonRoutes);
+app.use("/api/enrollments", enrollmentRoutes);
 
 // Error handling middleware must be after all routes
 app.use(errorHandler);

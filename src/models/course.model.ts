@@ -71,6 +71,13 @@ class Course
       as: "sections",
       onDelete: "CASCADE",
     });
+
+    // One-to-many relationship with Enrollment
+    Course.hasMany(models.Enrollment, {
+      foreignKey: "course_id",
+      as: "enrollments",
+      onDelete: "CASCADE",
+    });
   }
 }
 

@@ -1,24 +1,20 @@
-import { Request, Response, NextFunction } from "express";
-import categoryService from "../services/category.service";
-import { ApiError } from "../utils/api-error";
-import logger from "../utils/logger";
+import { Request, Response, NextFunction } from 'express';
+import categoryService from '../services/category.service';
+import { ApiError } from '../utils/api-error';
+import logger from '../utils/logger';
 
 class CategoryController {
   /**
    * Initialize the categories and course_categories tables
    */
-  async initTables(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async initTables(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       await categoryService.initCategoryTable();
       await categoryService.initCategoryCoursesTable();
 
       res.status(200).json({
         success: true,
-        message: "Category tables initialized successfully",
+        message: 'Category tables initialized successfully',
       });
     } catch (error) {
       next(error);
@@ -28,11 +24,7 @@ class CategoryController {
   /**
    * Create a new category
    */
-  async createCategory(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async createCategory(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { name, description, parent_id } = req.body;
 
@@ -54,11 +46,7 @@ class CategoryController {
   /**
    * Get a category by ID
    */
-  async getCategoryById(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async getCategoryById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id;
       const category = await categoryService.getCategoryById(id);
@@ -75,11 +63,7 @@ class CategoryController {
   /**
    * Get a category by slug
    */
-  async getCategoryBySlug(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async getCategoryBySlug(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const slug = req.params.slug;
       const category = await categoryService.getCategoryBySlug(slug);
@@ -96,11 +80,7 @@ class CategoryController {
   /**
    * Get all categories with pagination and filtering
    */
-  async getAllCategories(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async getAllCategories(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
@@ -108,14 +88,11 @@ class CategoryController {
       // Handle parent_id filtering
       let parent_id: string | null | undefined = undefined;
       if (req.query.parent_id !== undefined) {
-        parent_id =
-          req.query.parent_id === "null"
-            ? null
-            : (req.query.parent_id as string);
+        parent_id = req.query.parent_id === 'null' ? null : (req.query.parent_id as string);
       }
 
       // Handle includeInactive parameter
-      const includeInactive = req.query.include_inactive === "true";
+      const includeInactive = req.query.include_inactive === 'true';
 
       const result = await categoryService.getAllCategories({
         page,
@@ -142,17 +119,11 @@ class CategoryController {
   /**
    * Get category hierarchy as a tree structure
    */
-  async getCategoryHierarchy(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async getCategoryHierarchy(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const includeInactive = req.query.include_inactive === "true";
-      console.log("includeInactive", includeInactive);
-      const hierarchy = await categoryService.getCategoryHierarchy(
-        includeInactive
-      );
+      const includeInactive = req.query.include_inactive === 'true';
+      console.log('includeInactive', includeInactive);
+      const hierarchy = await categoryService.getCategoryHierarchy(includeInactive);
 
       res.status(200).json({
         success: true,
@@ -166,11 +137,7 @@ class CategoryController {
   /**
    * Update a category
    */
-  async updateCategory(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async updateCategory(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
       const { name, description, parent_id, is_active } = req.body;
@@ -193,18 +160,14 @@ class CategoryController {
   /**
    * Delete a category
    */
-  async deleteCategory(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async deleteCategory(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id;
       await categoryService.deleteCategory(id);
 
       res.status(200).json({
         success: true,
-        message: "Category deleted successfully",
+        message: 'Category deleted successfully',
       });
     } catch (error) {
       next(error);
@@ -214,17 +177,13 @@ class CategoryController {
   /**
    * Add default categories
    */
-  async addDefaultCategories(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async addDefaultCategories(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const categories = await categoryService.addDefaultCategories();
 
       res.status(200).json({
         success: true,
-        message: "Default categories added successfully",
+        message: 'Default categories added successfully',
         data: categories,
       });
     } catch (error) {
@@ -251,7 +210,7 @@ class CategoryController {
 
       res.status(200).json({
         success: true,
-        message: "Course associated with category successfully",
+        message: 'Course associated with category successfully',
       });
     } catch (error) {
       next(error);
@@ -270,14 +229,11 @@ class CategoryController {
       const course_id = req.params.courseId;
       const { category_id } = req.body;
 
-      await categoryService.disassociateCourseFromCategory(
-        course_id,
-        category_id
-      );
+      await categoryService.disassociateCourseFromCategory(course_id, category_id);
 
       res.status(200).json({
         success: true,
-        message: "Course disassociated from category successfully",
+        message: 'Course disassociated from category successfully',
       });
     } catch (error) {
       next(error);
@@ -287,16 +243,10 @@ class CategoryController {
   /**
    * Get categories for a course
    */
-  async getCategoriesForCourse(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async getCategoriesForCourse(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const course_id = req.params.courseId;
-      const categories = await categoryService.getCategoriesForCourse(
-        course_id
-      );
+      const categories = await categoryService.getCategoriesForCourse(course_id);
 
       res.status(200).json({
         success: true,
@@ -310,16 +260,12 @@ class CategoryController {
   /**
    * Get courses for a category
    */
-  async getCoursesForCategory(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async getCoursesForCategory(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const category_id = req.params.categoryId;
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
-      const include_subcategories = req.query.include_subcategories === "true";
+      const include_subcategories = req.query.include_subcategories === 'true';
 
       const result = await categoryService.getCoursesForCategory(category_id, {
         page,
@@ -345,11 +291,7 @@ class CategoryController {
   /**
    * Get counts of courses in each category
    */
-  async getCategoryCounts(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async getCategoryCounts(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const counts = await categoryService.getCategoryCounts();
 

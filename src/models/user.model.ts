@@ -42,6 +42,41 @@ class User
   public async verifyPassword(password: string): Promise<boolean> {
     return bcrypt.compare(password, this.password);
   }
+
+  // Define associations
+  public static associate(models: any): void {
+    // User has many UserRoles
+    User.hasMany(models.UserRole, {
+      foreignKey: "user_id",
+      as: "roles",
+    });
+
+    // User has many RefreshTokens
+    User.hasMany(models.RefreshToken, {
+      foreignKey: "user_id",
+      as: "refreshTokens",
+    });
+
+    // User has many Courses (as instructor)
+    User.hasMany(models.Course, {
+      foreignKey: "instructor_id",
+      as: "courses",
+    });
+
+    // User has many Enrollments (as student)
+    User.hasMany(models.Enrollment, {
+      foreignKey: "user_id",
+      as: "enrollments",
+      onDelete: "CASCADE",
+    });
+
+    // User has many LessonCompletions
+    User.hasMany(models.LessonCompletion, {
+      foreignKey: "user_id",
+      as: "completedLessons",
+      onDelete: "CASCADE",
+    });
+  }
 }
 
 // Initialize User model

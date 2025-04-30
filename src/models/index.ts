@@ -9,6 +9,7 @@ import CourseCategory from "./course-category.model";
 import Section from "./section.model";
 import Lesson from "./lesson.model";
 import LessonCompletion from "./lesson-completion.model";
+import Enrollment from "./enrollment.model";
 
 // Load environment variables
 config();
@@ -27,6 +28,7 @@ const models = {
   Section,
   Lesson,
   LessonCompletion,
+  Enrollment,
 };
 
 // Set up associations

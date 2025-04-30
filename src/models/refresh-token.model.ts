@@ -78,7 +78,7 @@ RefreshToken.init(
 );
 
 // Define association
-User.hasMany(RefreshToken, { foreignKey: "user_id", as: "refreshTokens" });
+// Note: The User-RefreshToken association is defined in the User model's associate method
 RefreshToken.belongsTo(User, { foreignKey: "user_id" });
 
 export default RefreshToken;
