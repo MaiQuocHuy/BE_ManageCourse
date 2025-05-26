@@ -34,7 +34,7 @@ export const updateCategorySchema = Joi.object({
 
 export const getHierarchySchema = Joi.object({
   query: Joi.object({
-    include_inactive: Joi.boolean().optional().default(true),
+    isActive: Joi.boolean().optional().default(true),
   }),
 });
 

@@ -94,11 +94,11 @@ router.post(
  *           type: integer
  *         description: Filter by parent_id (use 'null' for root categories)
  *       - in: query
- *         name: include_inactive
+ *         name: isActive
  *         required: true
  *         schema:
  *           type: boolean
- *         description: Include inactive categories
+ *         description: Inactive category
  *     responses:
  *       200:
  *         description: List of categories
@@ -116,11 +116,11 @@ router.get("/", categoryController.getAllCategories);
  *     tags: [Categories]
  *     parameters:
  *       - in: query
- *         name: include_inactive
+ *         name: isActive
  *         required: true
  *         schema:
  *           type: boolean
- *         description: Include inactive category
+ *         description: Inactive category
  *     responses:
  *       200:
  *         description: Category hierarchy

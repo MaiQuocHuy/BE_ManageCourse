@@ -1,6 +1,7 @@
 import { Transaction } from 'sequelize';
 import { categoryRepository } from '../repositories';
 import Category from '../models/category.model';
+import Course from '../models/course.model';
 import CourseCategory from '../models/course-category.model';
 import { slugify, createUniqueSlug } from '../utils/slugify';
 import { ApiError } from '../utils/api-error';
@@ -26,7 +27,7 @@ interface GetAllCategoriesOptions {
   page?: number;
   limit?: number;
   parent_id?: string | null;
-  includeInactive?: boolean;
+  isActive?: boolean;
 }
 
 interface CourseCategoryInput {
@@ -127,10 +128,10 @@ class CategoryService {
   /**
    * Get category hierarchy (tree structure)
    */
-  async getCategoryHierarchy(includeInactive: boolean = false): Promise<any[]> {
-    console.log('Fetching all categories...', includeInactive);
+  async getCategoryHierarchy(isActive: boolean = false): Promise<any[]> {
+    console.log('Fetching all categories...', isActive);
 
-    return await categoryRepository.getCategoryTree();
+    return await categoryRepository.getCategoryTree(isActive);
   }
 
   /**
@@ -376,16 +377,36 @@ class CategoryService {
    * Get all categories for a course
    */
   async getCategoriesForCourse(course_id: string): Promise<Category[]> {
-    return await categoryRepository.findAll({
-      include: [
-        {
-          model: CourseCategory,
-          as: 'course_categories',
-          where: { course_id },
-          attributes: [],
-        },
-      ],
+    // Query through the junction table directly
+    const courseCategoryRecords = await CourseCategory.findAll({
+      where: { course_id },
+      attributes: ['category_id'],
     });
+
+    const categoryIds = courseCategoryRecords.map(record => record.category_id);
+
+    if (categoryIds.length === 0) {
+      return [];
+    }
+
+    return await categoryRepository.findAll({
+      where: {
+        id: categoryIds,
+      },
+    });
+
+    // Alternative approach using Course association (if needed):
+    // return await categoryRepository.findAll({
+    //   include: [
+    //     {
+    //       model: Course,
+    //       as: 'courses',
+    //       where: { id: course_id },
+    //       attributes: [],
+    //       through: { attributes: [] }
+    //     }
+    //   ]
+    // });
   }
 
   /**

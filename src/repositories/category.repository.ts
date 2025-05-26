@@ -1,4 +1,4 @@
-import { Op, FindOptions, Transaction } from 'sequelize';
+import { Op, FindOptions, Transaction, where } from 'sequelize';
 import Category from '../models/category.model';
 import Course from '../models/course.model';
 import { BaseRepository } from './base.repository';
@@ -8,6 +8,7 @@ interface PaginationOptions {
   limit?: number;
   search?: string;
   parent_id?: string | null;
+  isActive?: boolean;
 }
 
 export class CategoryRepository extends BaseRepository<Category> {
@@ -71,7 +72,7 @@ export class CategoryRepository extends BaseRepository<Category> {
   async findWithPagination(
     options: PaginationOptions = {}
   ): Promise<{ categories: Category[]; total: number; page: number; limit: number }> {
-    const { page = 1, limit = 10, search, parent_id } = options;
+    const { page = 1, limit = 10, search, parent_id, isActive = false } = options;
     const offset = (page - 1) * limit;
 
     let whereClause: any = {};
@@ -86,6 +87,8 @@ export class CategoryRepository extends BaseRepository<Category> {
     if (parent_id !== undefined) {
       whereClause.parent_id = parent_id;
     }
+
+    whereClause.is_active = isActive ? true : false;
 
     const { count, rows } = await this.findAndCountAll({
       where: whereClause,
@@ -304,8 +307,26 @@ export class CategoryRepository extends BaseRepository<Category> {
   /**
    * Get category tree structure
    */
-  async getCategoryTree(): Promise<any[]> {
-    const rootCategories = await this.findWithSubcategories();
+  async getCategoryTree(isActive: boolean = false): Promise<any[]> {
+    // Create where clause based on isActive
+    const whereClause: any = { parent_id: null };
+
+    whereClause.is_active = isActive ? true : false;
+
+    // Create include options for children
+    const childrenInclude: any = {
+      model: Category,
+      as: 'children',
+      required: false,
+      order: [['display_order', 'ASC']],
+    };
+
+    // Get root categories with filtered subcategories
+    const rootCategories = await this.findAll({
+      where: whereClause,
+      include: [childrenInclude],
+      order: [['display_order', 'ASC']],
+    });
 
     const buildTree = (categories: Category[]): any[] => {
       return categories.map(category => ({

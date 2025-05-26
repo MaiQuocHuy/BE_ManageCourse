@@ -90,13 +90,13 @@ class CategoryController {
       }
 
       // Handle includeInactive parameter
-      const includeInactive = req.query.include_inactive === 'true';
+      const isActive = req.query.isActive === 'true';
 
       const result = await categoryService.getAllCategories({
         page,
         limit,
         parent_id,
-        includeInactive,
+        isActive,
       });
 
       res.status(200).json({
@@ -119,9 +119,8 @@ class CategoryController {
    */
   async getCategoryHierarchy(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const includeInactive = req.query.include_inactive === 'true';
-      console.log('includeInactive', includeInactive);
-      const hierarchy = await categoryService.getCategoryHierarchy(includeInactive);
+      const isActive = req.query.isActive === 'true';
+      const hierarchy = await categoryService.getCategoryHierarchy(isActive);
 
       res.status(200).json({
         success: true,
