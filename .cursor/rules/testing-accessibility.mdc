@@ -1,0 +1,24 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Testing & Accessibility
+
+## Testing
+- Write unit tests for components and utilities
+- Implement integration tests for critical paths
+- Ensure test coverage for edge cases
+- Write tests that are maintainable and clear
+- Use meaningful test descriptions
+
+All tests should follow the naming convention: `{feature}.test.{js|ts}` or `{feature}.spec.{js|ts}`
+
+## Accessibility
+- Use semantic HTML elements
+- Include proper alt text for images
+- Ensure keyboard navigation works
+- Maintain sufficient color contrast
+- Test with screen readers when possible
+- Follow WCAG 2.1 guidelines at AA level
+

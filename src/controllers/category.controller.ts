@@ -1,7 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import categoryService from '../services/category.service';
-import { ApiError } from '../utils/api-error';
-import logger from '../utils/logger';
 
 class CategoryController {
   /**

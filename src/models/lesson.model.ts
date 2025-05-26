@@ -85,17 +85,17 @@ Lesson.init(
       type: DataTypes.STRING(20),
       allowNull: false,
       references: {
-        model: "course_sections",
-        key: "id",
+        model: 'course_sections',
+        key: 'id',
       },
-      onDelete: "CASCADE",
+      onDelete: 'CASCADE',
     },
     title: {
       type: DataTypes.STRING(255),
       allowNull: false,
     },
     type: {
-      type: DataTypes.ENUM("video"),
+      type: DataTypes.ENUM('video'),
       allowNull: false,
       defaultValue: LessonType.VIDEO,
     },
@@ -106,7 +106,7 @@ Lesson.init(
     duration: {
       type: DataTypes.INTEGER,
       allowNull: true,
-      comment: "Duration in seconds",
+      comment: 'Duration in seconds',
     },
     order_index: {
       type: DataTypes.INTEGER,
@@ -135,11 +135,29 @@ Lesson.init(
   },
   {
     sequelize,
-    modelName: "Lesson",
-    tableName: "lessons",
+    modelName: 'Lesson',
+    tableName: 'lessons',
     timestamps: true,
-    createdAt: "created_at",
-    updatedAt: "updated_at",
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+    indexes: [
+      {
+        fields: ['section_id'],
+        name: 'lessons_section_id_idx',
+      },
+      {
+        fields: ['section_id', 'order_index'],
+        name: 'lessons_section_order_idx',
+      },
+      {
+        fields: ['is_free'],
+        name: 'lessons_is_free_idx',
+      },
+      {
+        fields: ['type'],
+        name: 'lessons_type_idx',
+      },
+    ],
   }
 );
 

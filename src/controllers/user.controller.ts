@@ -1,16 +1,11 @@
-import { Request, Response, NextFunction } from "express";
-import userService from "../services/user.service";
-import { Role } from "../models/user-role.model";
-import { ApiError } from "../utils/api-error";
-import { uploadToCloudinary } from "../utils/upload";
-
+import { Request, Response, NextFunction } from 'express';
+import { Role } from '../models/user-role.model';
+import { ApiError } from '../utils/api-error';
+import { uploadToCloudinary } from '../utils/upload';
+import userService from '../services/user.service';
 class UserController {
   // Register a new user
-  async register(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { name, email, password } = req.body;
 
@@ -21,10 +16,7 @@ class UserController {
       });
 
       // Generate tokens for immediate login
-      const { accessToken, refreshToken } = await userService.login(
-        email,
-        password
-      );
+      const { accessToken, refreshToken } = await userService.login(email, password);
 
       res.status(201).json({
         success: true,
@@ -48,10 +40,7 @@ class UserController {
     try {
       const { email, password } = req.body;
 
-      const { accessToken, refreshToken, user } = await userService.login(
-        email,
-        password
-      );
+      const { accessToken, refreshToken, user } = await userService.login(email, password);
 
       res.status(200).json({
         success: true,
@@ -78,14 +67,14 @@ class UserController {
       const { refreshToken } = req.body;
 
       if (!refreshToken) {
-        throw new ApiError(400, "Refresh token is required");
+        throw new ApiError(400, 'Refresh token is required');
       }
 
       await userService.logout(refreshToken);
 
       res.status(200).json({
         success: true,
-        message: "Logged out successfully",
+        message: 'Logged out successfully',
       });
     } catch (error) {
       next(error);
@@ -93,21 +82,15 @@ class UserController {
   }
 
   // Refresh access token
-  async refreshToken(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async refreshToken(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { refreshToken } = req.body;
 
       if (!refreshToken) {
-        throw new ApiError(400, "Refresh token is required");
+        throw new ApiError(400, 'Refresh token is required');
       }
 
-      const { accessToken, user } = await userService.refreshAccessToken(
-        refreshToken
-      );
+      const { accessToken, user } = await userService.refreshAccessToken(refreshToken);
 
       res.status(200).json({
         success: true,
@@ -126,16 +109,12 @@ class UserController {
   }
 
   // Get current user profile
-  async getCurrentUser(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async getCurrentUser(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user?.id;
 
       if (!userId) {
-        throw new ApiError(401, "Not authenticated");
+        throw new ApiError(401, 'Not authenticated');
       }
 
       const user = await userService.getUserById(String(userId));
@@ -150,7 +129,7 @@ class UserController {
           bio: user.bio,
           profile_thumbnail: user.profile_thumbnail,
           is_active: user.is_active,
-          roles: roles.map((role) => role.role),
+          roles: roles.map(role => role.role),
         },
       });
     } catch (error) {
@@ -159,11 +138,7 @@ class UserController {
   }
 
   // Get user by ID
-  async getUserById(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async getUserById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.params.id;
 
@@ -179,7 +154,7 @@ class UserController {
           bio: user.bio,
           profile_thumbnail: user.profile_thumbnail,
           is_active: user.is_active,
-          roles: roles.map((role) => role.role),
+          roles: roles.map(role => role.role),
         },
       });
     } catch (error) {
@@ -188,23 +163,19 @@ class UserController {
   }
 
   // Update user
-  async updateUser(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async updateUser(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.params.id;
       const { name, bio } = req.body;
 
       // Check if user is authorized (admin or the user themselves)
       if (req.user?.id !== userId && !req.user?.roles.includes(Role.ADMIN)) {
-        throw new ApiError(403, "Not authorized to update this user");
+        throw new ApiError(403, 'Not authorized to update this user');
       }
 
       let profile_thumbnail = undefined;
-      console.log("Name, bio:", name, bio);
-      console.log("Files", req.file);
+      console.log('Name, bio:', name, bio);
+      console.log('Files', req.file);
       if (req.file) {
         profile_thumbnail = await uploadToCloudinary(req.file);
       }
@@ -233,28 +204,21 @@ class UserController {
   }
 
   // Change password
-  async changePassword(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.params.id;
       const { currentPassword, newPassword } = req.body;
 
       // Check if user is authorized (only the user themselves)
       if (req.user?.id !== userId) {
-        throw new ApiError(
-          403,
-          "Not authorized to change this user's password"
-        );
+        throw new ApiError(403, "Not authorized to change this user's password");
       }
 
       await userService.changePassword(userId, currentPassword, newPassword);
 
       res.status(200).json({
         success: true,
-        message: "Password changed successfully",
+        message: 'Password changed successfully',
       });
     } catch (error) {
       next(error);
@@ -262,17 +226,13 @@ class UserController {
   }
 
   // Add role to user
-  async addUserRole(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async addUserRole(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.params.id;
       const { role } = req.body;
 
       if (!Object.values(Role).includes(role)) {
-        throw new ApiError(400, "Invalid role");
+        throw new ApiError(400, 'Invalid role');
       }
 
       await userService.addUserRole(userId, role);
@@ -287,17 +247,13 @@ class UserController {
   }
 
   // Remove role from user
-  async removeUserRole(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async removeUserRole(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const userId = parseInt(req.params.id);
+      const userId = req.params.id;
       const { role } = req.body;
 
       if (!Object.values(Role).includes(role)) {
-        throw new ApiError(400, "Invalid role");
+        throw new ApiError(400, 'Invalid role');
       }
 
       await userService.removeUserRole(userId, role);
@@ -312,11 +268,7 @@ class UserController {
   }
 
   // Get all users (with pagination and filtering)
-  async getAllUsers(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async getAllUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
@@ -346,24 +298,20 @@ class UserController {
   }
 
   // Delete user
-  async deleteUser(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async deleteUser(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.params.id;
 
       // Check if user is authorized (admin or the user themselves)
       if (req.user?.id !== userId && !req.user?.roles.includes(Role.ADMIN)) {
-        throw new ApiError(403, "Not authorized to delete this user");
+        throw new ApiError(403, 'Not authorized to delete this user');
       }
 
       await userService.deleteUser(userId);
 
       res.status(200).json({
         success: true,
-        message: "User deleted successfully",
+        message: 'User deleted successfully',
       });
     } catch (error) {
       next(error);

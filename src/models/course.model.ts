@@ -53,30 +53,37 @@ class Course
   public static associate(models: any): void {
     // Course belongs to User (instructor)
     Course.belongsTo(models.User, {
-      foreignKey: "instructor_id",
-      as: "instructor",
+      foreignKey: 'instructor_id',
+      as: 'instructor',
     });
 
     // Many-to-many relationship with Category
     Course.belongsToMany(models.Category, {
-      through: "course_categories",
-      foreignKey: "course_id",
-      otherKey: "category_id",
-      as: "categories",
+      through: 'course_categories',
+      foreignKey: 'course_id',
+      otherKey: 'category_id',
+      as: 'categories',
     });
 
     // One-to-many relationship with Section
     Course.hasMany(models.Section, {
-      foreignKey: "course_id",
-      as: "sections",
-      onDelete: "CASCADE",
+      foreignKey: 'course_id',
+      as: 'sections',
+      onDelete: 'CASCADE',
     });
 
     // One-to-many relationship with Enrollment
     Course.hasMany(models.Enrollment, {
-      foreignKey: "course_id",
-      as: "enrollments",
-      onDelete: "CASCADE",
+      foreignKey: 'course_id',
+      as: 'enrollments',
+      onDelete: 'CASCADE',
+    });
+
+    // One-to-many relationship with Review
+    Course.hasMany(models.Review, {
+      foreignKey: 'course_id',
+      as: 'reviews',
+      onDelete: 'CASCADE',
     });
   }
 }
@@ -102,10 +109,10 @@ Course.init(
       type: DataTypes.STRING(20),
       allowNull: false,
       references: {
-        model: "users",
-        key: "id",
+        model: 'users',
+        key: 'id',
       },
-      onDelete: "CASCADE",
+      onDelete: 'CASCADE',
     },
     price: {
       type: DataTypes.DECIMAL(10, 2),
@@ -143,11 +150,33 @@ Course.init(
   },
   {
     sequelize,
-    modelName: "Course",
-    tableName: "courses",
+    modelName: 'Course',
+    tableName: 'courses',
     timestamps: true,
-    createdAt: "created_at",
-    updatedAt: "updated_at",
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+    indexes: [
+      {
+        fields: ['instructor_id'],
+        name: 'courses_instructor_id_idx',
+      },
+      {
+        fields: ['is_published', 'is_approved'],
+        name: 'courses_status_idx',
+      },
+      {
+        fields: ['price'],
+        name: 'courses_price_idx',
+      },
+      {
+        fields: ['created_at'],
+        name: 'courses_created_at_idx',
+      },
+      {
+        fields: ['title'],
+        name: 'courses_title_idx',
+      },
+    ],
   }
 );
 

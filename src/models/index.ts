@@ -10,6 +10,9 @@ import Section from "./section.model";
 import Lesson from "./lesson.model";
 import LessonCompletion from "./lesson-completion.model";
 import Enrollment from "./enrollment.model";
+import Payment from "./payment.model";
+import Refund from "./refund.model";
+import Review from "./review.model";
 
 // Load environment variables
 config();
@@ -29,6 +32,9 @@ const models = {
   Lesson,
   LessonCompletion,
   Enrollment,
+  Payment,
+  Refund,
+  Review,
 };
 
 // Set up associations

@@ -1,11 +1,6 @@
-import { Op } from "sequelize";
-import Enrollment from "../models/enrollment.model";
-import Course from "../models/course.model";
-import User from "../models/user.model";
-import Section from "../models/section.model";
-import Lesson from "../models/lesson.model";
-import { ApiError } from "../utils/api-error";
-import sequelize from "../config/database";
+import { enrollmentRepository, userRepository, courseRepository } from '../repositories';
+import Enrollment from '../models/enrollment.model';
+import { ApiError } from '../utils/api-error';
 
 interface PaginationOptions {
   page?: number;
@@ -17,30 +12,27 @@ class EnrollmentService {
   /**
    * Create a new enrollment
    */
-  async createEnrollment(
-    user_id: string,
-    course_id: string
-  ): Promise<Enrollment> {
-    // Check if user is already enrolled in the course
+  async createEnrollment(user_id: string, course_id: string): Promise<Enrollment> {
+    // Check if user is already enrolled in the course using repository
     const existingEnrollment = await this.isUserEnrolled(user_id, course_id);
     if (existingEnrollment) {
-      throw new ApiError(400, "User is already enrolled in this course");
+      throw new ApiError(400, 'User is already enrolled in this course');
     }
 
-    // Check if course exists
-    const course = await Course.findByPk(course_id);
+    // Check if course exists using repository
+    const course = await courseRepository.findById(course_id);
     if (!course) {
-      throw new ApiError(404, "Course not found");
+      throw new ApiError(404, 'Course not found');
     }
 
-    // Check if user exists
-    const user = await User.findByPk(user_id);
+    // Check if user exists using repository
+    const user = await userRepository.findById(user_id);
     if (!user) {
-      throw new ApiError(404, "User not found");
+      throw new ApiError(404, 'User not found');
     }
 
-    // Create enrollment
-    return await Enrollment.create({
+    // Create enrollment using repository
+    return await enrollmentRepository.create({
       user_id,
       course_id,
     });
@@ -50,23 +42,10 @@ class EnrollmentService {
    * Get enrollment by ID
    */
   async getEnrollmentById(id: string): Promise<Enrollment> {
-    const enrollment = await Enrollment.findByPk(id, {
-      include: [
-        {
-          model: User,
-          as: "student",
-          attributes: ["id", "name", "email", "profile_thumbnail"],
-        },
-        {
-          model: Course,
-          as: "course",
-          attributes: ["id", "title", "thumbnail", "price"],
-        },
-      ],
-    });
+    const enrollment = await enrollmentRepository.findByIdWithDetails(id);
 
     if (!enrollment) {
-      throw new ApiError(404, "Enrollment not found");
+      throw new ApiError(404, 'Enrollment not found');
     }
 
     return enrollment;
@@ -75,16 +54,8 @@ class EnrollmentService {
   /**
    * Check if a user is enrolled in a course
    */
-  async isUserEnrolled(
-    user_id: string,
-    course_id: string
-  ): Promise<Enrollment | null> {
-    return await Enrollment.findOne({
-      where: {
-        user_id,
-        course_id,
-      },
-    });
+  async isUserEnrolled(user_id: string, course_id: string): Promise<Enrollment | null> {
+    return await enrollmentRepository.findByUserAndCourse(user_id, course_id);
   }
 
   /**
@@ -94,54 +65,7 @@ class EnrollmentService {
     user_id: string,
     options: PaginationOptions = {}
   ): Promise<{ enrollments: Enrollment[]; total: number; page: number; limit: number }> {
-    const { page = 1, limit = 10, search } = options;
-    const offset = (page - 1) * limit;
-
-    let whereClause: any = { user_id };
-    let courseWhereClause: any = {};
-
-    if (search) {
-      courseWhereClause = {
-        title: { [Op.like]: `%${search}%` },
-      };
-    }
-
-    const { count, rows } = await Enrollment.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: Course,
-          as: "course",
-          where: courseWhereClause,
-          attributes: [
-            "id",
-            "title",
-            "description",
-            "thumbnail",
-            "price",
-            "is_published",
-          ],
-          include: [
-            {
-              model: User,
-              as: "instructor",
-              attributes: ["id", "name", "profile_thumbnail"],
-            },
-          ],
-        },
-      ],
-      limit,
-      offset,
-      distinct: true,
-      order: [["created_at", "DESC"]],
-    });
-
-    return {
-      enrollments: rows,
-      total: count,
-      page,
-      limit,
-    };
+    return await enrollmentRepository.findByUserId(user_id, options);
   }
 
   /**
@@ -151,55 +75,19 @@ class EnrollmentService {
     course_id: string,
     options: PaginationOptions = {}
   ): Promise<{ enrollments: Enrollment[]; total: number; page: number; limit: number }> {
-    const { page = 1, limit = 10, search } = options;
-    const offset = (page - 1) * limit;
-
-    let whereClause: any = { course_id };
-    let userWhereClause: any = {};
-
-    if (search) {
-      userWhereClause = {
-        [Op.or]: [
-          { name: { [Op.like]: `%${search}%` } },
-          { email: { [Op.like]: `%${search}%` } },
-        ],
-      };
-    }
-
-    const { count, rows } = await Enrollment.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: User,
-          as: "student",
-          where: userWhereClause,
-          attributes: ["id", "name", "email", "profile_thumbnail"],
-        },
-      ],
-      limit,
-      offset,
-      distinct: true,
-      order: [["created_at", "DESC"]],
-    });
-
-    return {
-      enrollments: rows,
-      total: count,
-      page,
-      limit,
-    };
+    return await enrollmentRepository.findByCourseId(course_id, options);
   }
 
   /**
    * Calculate the total revenue generated by a course
    */
   async getCourseRevenue(course_id: string): Promise<number> {
-    const course = await Course.findByPk(course_id);
+    const course = await courseRepository.findById(course_id);
     if (!course) {
-      throw new ApiError(404, "Course not found");
+      throw new ApiError(404, 'Course not found');
     }
 
-    const enrollmentCount = await Enrollment.count({
+    const enrollmentCount = await enrollmentRepository.count({
       where: { course_id },
     });
 
@@ -211,29 +99,7 @@ class EnrollmentService {
    * Get the number of unique students enrolled in an instructor's courses
    */
   async getStudentCountByInstructor(instructor_id: string): Promise<number> {
-    // Get all courses by the instructor
-    const courses = await Course.findAll({
-      where: { instructor_id },
-      attributes: ["id"],
-    });
-
-    if (courses.length === 0) {
-      return 0;
-    }
-
-    const courseIds = courses.map((course) => course.id);
-
-    // Count unique students enrolled in these courses
-    const uniqueStudentCount = await Enrollment.count({
-      where: {
-        course_id: { [Op.in]: courseIds },
-      },
-      attributes: [
-        [sequelize.fn("DISTINCT", sequelize.col("user_id")), "user_id"],
-      ],
-    });
-
-    return uniqueStudentCount;
+    return await enrollmentRepository.getStudentCountByInstructor(instructor_id);
   }
 
   /**
@@ -242,65 +108,7 @@ class EnrollmentService {
   async getMostPopularCourses(
     options: PaginationOptions = {}
   ): Promise<{ courses: any[]; total: number; page: number; limit: number }> {
-    const { page = 1, limit = 10 } = options;
-    const offset = (page - 1) * limit;
-
-    // Get courses with enrollment count
-    const coursesWithCount = await Course.findAll({
-      attributes: {
-        include: [
-          [
-            sequelize.fn("COUNT", sequelize.col("enrollments.id")),
-            "enrollment_count",
-          ],
-        ],
-      },
-      include: [
-        {
-          model: Enrollment,
-          as: "enrollments",
-          attributes: [],
-        },
-        {
-          model: User,
-          as: "instructor",
-          attributes: ["id", "name", "profile_thumbnail"],
-        },
-      ],
-      where: {
-        is_published: true,
-        is_approved: true,
-      },
-      group: ["Course.id"],
-      order: [[sequelize.literal("enrollment_count"), "DESC"]],
-      limit,
-      offset,
-      subQuery: false,
-    });
-
-    // Count total courses with enrollments
-    const totalCoursesWithEnrollments = await Course.count({
-      distinct: true,
-      include: [
-        {
-          model: Enrollment,
-          as: "enrollments",
-          attributes: [],
-          required: true,
-        },
-      ],
-      where: {
-        is_published: true,
-        is_approved: true,
-      },
-    });
-
-    return {
-      courses: coursesWithCount,
-      total: totalCoursesWithEnrollments,
-      page,
-      limit,
-    };
+    return await enrollmentRepository.getMostPopularCourses(options);
   }
 }
 

@@ -25,27 +25,37 @@ CourseCategory.init(
       primaryKey: true,
       allowNull: false,
       references: {
-        model: "courses",
-        key: "id",
+        model: 'courses',
+        key: 'id',
       },
-      onDelete: "CASCADE",
+      onDelete: 'CASCADE',
     },
     category_id: {
       type: DataTypes.STRING(20),
       primaryKey: true,
       allowNull: false,
       references: {
-        model: "categories",
-        key: "id",
+        model: 'categories',
+        key: 'id',
       },
-      onDelete: "CASCADE",
+      onDelete: 'CASCADE',
     },
   },
   {
-    tableName: "course_categories",
+    tableName: 'course_categories',
     sequelize,
     timestamps: false,
     underscored: true,
+    indexes: [
+      {
+        fields: ['course_id'],
+        name: 'course_categories_course_id_idx',
+      },
+      {
+        fields: ['category_id'],
+        name: 'course_categories_category_id_idx',
+      },
+    ],
   }
 );
 

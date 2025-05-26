@@ -1,0 +1,31 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Dependencies & Documentation
+
+## Dependencies
+- Keep dependencies up to date
+- Be selective about adding new dependencies
+- Document why specific dependencies are needed
+- Use exact versions in [package.json](mdc:package.json)
+
+Our main dependencies can be found in [package.json](mdc:package.json).
+
+## Documentation
+- Document API endpoints and their parameters
+- Maintain up-to-date [README.md](mdc:README.md) with setup instructions
+- Document complex algorithms and business logic
+- Keep documentation in sync with code changes
+
+## Models
+We have documented the following data models:
+- [ModelUser(Course).txt](mdc:ModelUser(Course).txt)
+- [ModelCourse.txt](mdc:ModelCourse.txt)
+- [ModelSection.txt](mdc:ModelSection.txt)
+- [ModelLesson.txt](mdc:ModelLesson.txt)
+- [ModelEnrollment.txt](mdc:ModelEnrollment.txt)
+- [ModelCategory(Course).txt](mdc:ModelCategory(Course).txt)
+
+-   

@@ -1,0 +1,29 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Code Quality & Security
+
+## Code Quality
+- Write unit tests for critical functionality
+- Ensure all code passes linting before commit
+- Use TypeScript types/interfaces for better code safety
+- Avoid `any` and explicit type assertions when possible
+- Avoid duplicate code, extract reusable functions
+- Handle errors properly, don't silence exceptions
+
+## Security
+- Validate all user inputs
+- Sanitize data before displaying to prevent XSS
+- Use parameterized queries to prevent SQL injection
+- Don't store sensitive information in client-side code
+- Implement proper authentication and authorization
+
+## Performance
+- Optimize expensive operations
+- Be mindful of memory usage
+- Use appropriate data structures for the task
+- Consider pagination for large data sets
+- Implement appropriate caching strategies
+

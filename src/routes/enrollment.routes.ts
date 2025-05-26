@@ -65,39 +65,6 @@ router.post(
 
 /**
  * @swagger
- * /api/enrollments/{id}:
- *   get:
- *     summary: Get enrollment by ID
- *     tags: [Enrollments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Enrollment details
- *       401:
- *         description: Not authenticated
- *       403:
- *         description: Not authorized
- *       404:
- *         description: Enrollment not found
- *       500:
- *         description: Server error
- */
-router.get(
-  "/:id",
-  authenticate,
-  validateRequest(getEnrollmentSchema),
-  enrollmentController.getEnrollmentById
-);
-
-/**
- * @swagger
  * /api/enrollments/check:
  *   get:
  *     summary: Check if user is enrolled in a course
@@ -165,6 +132,71 @@ router.get(
   authenticate,
   validateRequest(getUserEnrollmentsSchema),
   enrollmentController.getUserEnrollments
+);
+
+/**
+ * @swagger
+ * /api/enrollments/popular:
+ *   get:
+ *     summary: Get the most popular courses based on enrollment count
+ *     tags: [Enrollments]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Number of items per page
+ *     responses:
+ *       200:
+ *         description: List of popular courses
+ *       500:
+ *         description: Server error
+ */
+router.get(
+  "/popular",
+  validateRequest(getMostPopularCoursesSchema),
+  enrollmentController.getMostPopularCourses
+);
+
+/**
+ * @swagger
+ * /api/enrollments/{id}:
+ *   get:
+ *     summary: Get enrollment by ID
+ *     tags: [Enrollments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Enrollment details
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Enrollment not found
+ *       500:
+ *         description: Server error
+ */
+router.get(
+  "/:id",
+  authenticate,
+  validateRequest(getEnrollmentSchema),
+  enrollmentController.getEnrollmentById
 );
 
 /**
@@ -331,38 +363,6 @@ router.get(
   authorize([Role.INSTRUCTOR, Role.ADMIN]),
   validateRequest(getStudentCountByInstructorSchema),
   enrollmentController.getStudentCountByInstructor
-);
-
-/**
- * @swagger
- * /api/enrollments/popular:
- *   get:
- *     summary: Get the most popular courses based on enrollment count
- *     tags: [Enrollments]
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           minimum: 1
- *         description: Page number
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 100
- *         description: Number of items per page
- *     responses:
- *       200:
- *         description: List of popular courses
- *       500:
- *         description: Server error
- */
-router.get(
-  "/popular",
-  validateRequest(getMostPopularCoursesSchema),
-  enrollmentController.getMostPopularCourses
 );
 
 export default router;

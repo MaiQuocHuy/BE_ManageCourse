@@ -44,7 +44,7 @@ RefreshToken.init(
       allowNull: false,
       references: {
         model: User,
-        key: "id",
+        key: 'id',
       },
     },
     token: {
@@ -71,9 +71,27 @@ RefreshToken.init(
   },
   {
     sequelize,
-    tableName: "refresh_tokens",
+    tableName: 'refresh_tokens',
     timestamps: true,
     underscored: true,
+    indexes: [
+      {
+        fields: ['user_id'],
+        name: 'refresh_tokens_user_id_idx',
+      },
+      {
+        fields: ['token'],
+        name: 'refresh_tokens_token_idx',
+      },
+      {
+        fields: ['expires_at'],
+        name: 'refresh_tokens_expires_at_idx',
+      },
+      {
+        fields: ['is_revoked'],
+        name: 'refresh_tokens_is_revoked_idx',
+      },
+    ],
   }
 );
 

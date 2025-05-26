@@ -1,0 +1,48 @@
+{
+  "workbench": {
+    "excludePaths": [
+      "node_modules/**",
+      ".git/**",
+      "dist/**",
+      "build/**",
+      "uploads/**"
+    ],
+    "indexIgnoredFiles": false
+  },
+  "editor": {
+    "formatOnSave": true,
+    "tabSize": 2,
+    "insertSpaces": true,
+    "wordWrap": "on"
+  },
+  "explorer": {
+    "sortOrder": "type",
+    "showHiddenFiles": true
+  },
+  "terminal": {
+    "defaultShell": "pwsh"
+  },
+  "search": {
+    "exclude": {
+      "**/.git": true,
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/build": true
+    }
+  },
+  "files": {
+    "associations": {
+      "*.js": "javascript",
+      "*.ts": "typescript",
+      "*.jsx": "javascriptreact",
+      "*.tsx": "typescriptreact",
+      "*.json": "json"
+    }
+  },
+  "prettier": {
+    "singleQuote": true,
+    "printWidth": 100,
+    "trailingComma": "es5",
+    "semi": true
+  }
+} 

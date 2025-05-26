@@ -1,0 +1,26 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Code Style Guidelines
+
+Follow these code style guidelines for consistent and maintainable code:
+
+- Use 2 spaces for indentation as configured in [.cursor.json](mdc:.cursor.json)
+- Use camelCase for variables and functions, PascalCase for classes and components
+- Keep functions small and focused on a single responsibility
+- Follow JavaScript/TypeScript best practices
+- Add descriptive comments for complex logic
+- Use meaningful variable and function names
+
+For formatting, we use Prettier with the following configuration:
+```json
+{
+  "singleQuote": true,
+  "printWidth": 100,
+  "trailingComma": "es5",
+  "semi": true
+}
+```
+

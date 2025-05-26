@@ -1,0 +1,102 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Cursor Rules: Sequelize Transactions, Indexing
+
+## Sequelize Transaction Best Practices
+
+### 1. Transaction Pattern
+```typescript
+async function doSomethingWithTransaction() {
+  let transaction: Transaction | null = null;
+  
+  try {
+    // Initialize transaction
+    transaction = await sequelize.transaction();
+    
+    // Perform operations with transaction
+    await Model.create({ ... }, { transaction });
+    await OtherModel.update({ ... }, { where: { ... }, transaction });
+    
+    // Commit transaction when all operations succeed
+    await transaction.commit();
+    transaction = null;
+    
+    return result;
+  } catch (error) {
+    // Safely handle rollback
+    if (transaction) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        console.error("Transaction rollback failed:", rollbackError);
+      }
+    }
+    throw error;
+  }
+}
+```
+
+### 2. Transaction Rules
+- **Always nullify** the transaction variable after commit
+- **Always check** if transaction exists before rolling back
+- **Always pass** the transaction to every query within the transaction block
+- **Never rollback** before throwing errors in the try block
+- **Use a single try/catch** for the entire transaction, not nested ones
+- **Wrap rollback** in its own try/catch to handle rollback failures
+- **Consider transaction isolation levels** for specific requirements
+
+### 3. Transaction Performance
+- Keep transactions as short as possible
+- Avoid heavy processing or external API calls within transactions
+- Use read-only transactions for read operations
+- Consider transaction timeouts for long-running transactions
+
+## Sequelize Indexing Guidelines
+
+### 1. When to Create Indexes
+- Foreign key columns
+- Columns used in WHERE clauses
+- Columns used in ORDER BY clauses
+- Columns used in GROUP BY
+- Join columns
+- Unique constraint columns
+
+### 2. Index Types
+- **Simple Index**: For single column lookups
+- **Composite Index**: For multi-column queries
+- **Unique Index**: Ensures uniqueness
+- **Partial Index**: Index subset of rows
+- **Text Indexes**: For text search
+
+### 3. Index Declaration
+```typescript
+// In model definition
+MyModel.init({
+  // fields...
+}, {
+  indexes: [
+    { fields: ['column_name'] },
+    { fields: ['col1', 'col2'], name: 'custom_index_name' },
+    { unique: true, fields: ['unique_column'] }
+  ]
+});
+
+// In migration
+await queryInterface.addIndex('table_name', ['column_name'], {
+  name: 'index_name',
+  unique: false
+});
+```
+
+### 4. Index Naming Convention
+- Use format: `[table]_[column(s)]_idx` for regular indexes
+- Use format: `[table]_[column(s)]_unique` for unique indexes
+
+### 5. Index Optimization
+- Don't over-index (slows down writes)
+- Monitor index usage and remove unused indexes
+- Index high-cardinality columns (many unique values)
+- Put most selective columns first in composite indexes

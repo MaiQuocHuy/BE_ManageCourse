@@ -90,10 +90,10 @@ Category.init(
       type: DataTypes.STRING(20),
       allowNull: true,
       references: {
-        model: "categories",
-        key: "id",
+        model: 'categories',
+        key: 'id',
       },
-      onDelete: "SET NULL",
+      onDelete: 'SET NULL',
     },
     is_active: {
       type: DataTypes.BOOLEAN,
@@ -117,10 +117,24 @@ Category.init(
     },
   },
   {
-    tableName: "categories",
+    tableName: 'categories',
     sequelize,
     timestamps: true,
     underscored: true,
+    indexes: [
+      {
+        fields: ['parent_id'],
+        name: 'categories_parent_id_idx',
+      },
+      {
+        fields: ['parent_id', 'display_order'],
+        name: 'categories_parent_order_idx',
+      },
+      {
+        fields: ['is_active'],
+        name: 'categories_is_active_idx',
+      },
+    ],
   }
 );
 

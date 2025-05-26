@@ -57,19 +57,19 @@ LessonCompletion.init(
       type: DataTypes.STRING(20),
       allowNull: false,
       references: {
-        model: "users",
-        key: "id",
+        model: 'users',
+        key: 'id',
       },
-      onDelete: "CASCADE",
+      onDelete: 'CASCADE',
     },
     lesson_id: {
       type: DataTypes.STRING(20),
       allowNull: false,
       references: {
-        model: "lessons",
-        key: "id",
+        model: 'lessons',
+        key: 'id',
       },
-      onDelete: "CASCADE",
+      onDelete: 'CASCADE',
     },
     completed_at: {
       type: DataTypes.DATE,
@@ -79,13 +79,25 @@ LessonCompletion.init(
   },
   {
     sequelize,
-    modelName: "LessonCompletion",
-    tableName: "lesson_completions",
+    modelName: 'LessonCompletion',
+    tableName: 'lesson_completions',
     timestamps: false,
     indexes: [
       {
         unique: true,
-        fields: ["user_id", "lesson_id"],
+        fields: ['user_id', 'lesson_id'],
+      },
+      {
+        fields: ['user_id'],
+        name: 'lesson_completions_user_id_idx',
+      },
+      {
+        fields: ['lesson_id'],
+        name: 'lesson_completions_lesson_id_idx',
+      },
+      {
+        fields: ['completed_at'],
+        name: 'lesson_completions_completed_at_idx',
       },
     ],
   }

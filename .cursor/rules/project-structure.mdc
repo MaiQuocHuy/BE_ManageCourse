@@ -1,0 +1,125 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Backend Project Structure
+1. Component-Based Structure
+src/
+├── config/                 # Configuration files
+├── controllers/            # Request handlers
+├── middlewares/            # Express middlewares
+├── models/                 # Database models
+├── repositories/           # Data access layer (e.g., Sequelize)
+├── routes/                 # Route definitions
+├── services/               # Business logic
+├── utils/                  # Utility functions
+├── migrations/             # Database migrations
+├── seeders/                # Database seed data
+├── types/                  # TypeScript type definitions
+├── validators/             # Request validation schemas
+├── tests/                  # Tests for all components
+│   ├── unit/
+│   ├── integration/
+│   └── e2e/
+└── app.ts                  # App entry point
+2. File Naming Conventions
+
+Use kebab-case for directories: user-profiles/
+
+Use kebab-case for files: auth.middleware.ts
+
+Add type suffixes: user.model.ts, auth.service.ts, user.repository.ts, users.controller.ts
+
+
+3. Code Organization Principles
+
+Single Responsibility: Each file should have one purpose
+
+DRY (Don't Repeat Yourself): Extract common code into utilities
+
+Dependency Injection: Pass dependencies rather than importing directly
+
+Layer Separation: Keep models, repositories, services, and controllers separate
+
+Thin Controllers: Keep controllers small, move logic to services
+
+4. API Design Best Practices
+
+Use RESTful conventions for CRUD operations
+
+Version your API: /api/v1/users
+
+Use proper HTTP status codes
+
+Consistent response formats
+
+Validate all input data
+
+Use query parameters for filtering, pagination
+
+Use appropriate HTTP methods (GET, POST, PUT, DELETE)
+
+5. Environment Configuration
+
+Use environment variables for configuration
+
+Different config files for development, testing, production
+
+Don't commit sensitive values to version control
+
+Validate environment variables on startup
+
+6. Error Handling
+
+Create a centralized error handler middleware
+
+Custom error classes for different error types
+
+Consistent error response structure
+
+Proper logging of errors
+
+7. Logging
+
+Use structured logging (JSON format)
+
+Different log levels (debug, info, warn, error)
+
+Request ID in logs for traceability
+
+Don't log sensitive information
+
+8. Security Best Practices
+
+Sanitize user inputs
+
+Use parameterized queries
+
+Set proper security headers
+
+Implement rate limiting
+
+Use HTTPS
+
+Secure authentication with JWT or session cookies
+
+Hash passwords with bcrypt
+
+Implement CSRF protection
+
+9. Testing Strategy
+
+Unit tests for isolated functions
+
+Integration tests for services and repositories
+
+API tests for controllers
+
+End-to-end tests for critical paths
+
+Use a test database
+
+Mock external services
+
+

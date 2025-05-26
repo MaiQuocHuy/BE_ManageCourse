@@ -1,0 +1,37 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Git Workflow
+
+Follow these Git practices for efficient collaboration:
+
+- Write clear, descriptive commit messages
+- Make small, focused commits
+- Create feature branches for new functionality
+- Don't commit directly to main/master branch
+- Use pull requests for code reviews
+
+## Commit Message Format
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+### Types:
+- feat: A new feature
+- fix: A bug fix
+- docs: Documentation only changes
+- style: Changes that do not affect the meaning of the code
+- refactor: A code change that neither fixes a bug nor adds a feature
+- perf: A code change that improves performance
+- test: Adding missing tests or correcting existing tests
+- chore: Changes to the build process or auxiliary tools
+
+## Gitignore
+Our [.gitignore](mdc:.gitignore) file specifies which files should not be tracked by Git.
+

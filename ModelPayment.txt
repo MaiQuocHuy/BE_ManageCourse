@@ -1,0 +1,260 @@
+1. Danh sách nghiệp vụ (Business Requirements)
+Dựa trên Payment Model và các phương thức được mô tả trong tài liệu (createPayment, getPaymentById, getUserPayments, getCoursePayments, updatePaymentStatus, processRefund, getTotalRevenue, getRevenueByTime, getRevenueStatistics, getInstructorRevenue, getHighestRevenueCourses), các nghiệp vụ cần thực hiện bao gồm:
+
+- Tạo thanh toán mới (Create Payment):
+  - Tạo bản ghi thanh toán cho học viên khi mua khóa học, đảm bảo giao dịch thành công trước khi tạo đăng ký khóa học (Enrollment).
+  - Hỗ trợ các phương thức thanh toán (credit_card, paypal, stripe, bank_transfer).
+  - Sử dụng transaction để đảm bảo tính toàn vẹn dữ liệu giữa payments và enrollments.
+  - Áp dụng queue hoặc giới hạn yêu cầu để tránh spam (nhiều yêu cầu thanh toán đồng thời).
+  - Yêu cầu xác thực JWT.
+
+- Lấy thông tin thanh toán (Get Payment Info):
+  - Lấy thông tin thanh toán theo ID.
+  - Hỗ trợ truy cập bởi học viên, giảng viên sở hữu khóa học, hoặc admin.
+
+- Lấy danh sách thanh toán của học viên (Get User Payments):
+  - Lấy tất cả thanh toán mà học viên đã thực hiện.
+  - Yêu cầu xác thực JWT, hỗ trợ phân trang.
+
+- Lấy danh sách thanh toán của khóa học (Get Course Payments):
+  - Lấy tất cả thanh toán liên quan đến một khóa học cụ thể.
+  - Chỉ giảng viên sở hữu khóa học hoặc admin được phép truy cập, hỗ trợ phân trang.
+
+- Cập nhật trạng thái thanh toán (Update Payment Status):
+  - Cập nhật trạng thái thanh toán (pending, completed, failed, refunded).
+  - Chỉ admin được phép thực thi.
+
+- Xử lý hoàn tiền (Process Refund):
+  - Khởi tạo yêu cầu hoàn tiền cho một thanh toán, sử dụng transaction để đảm bảo cập nhật đồng bộ giữa payments và refunds.
+  - Yêu cầu lý do hoàn tiền và xác thực JWT (học viên hoặc admin).
+
+- Tính tổng doanh thu (Get Total Revenue):
+  - Tính tổng doanh thu của toàn bộ nền tảng từ các thanh toán.
+  - Chỉ admin được phép truy cập.
+
+- Tính doanh thu theo thời gian (Get Revenue by Time):
+  - Tính doanh thu theo khoảng thời gian (ngày, tháng, năm).
+  - Chỉ admin được phép truy cập.
+
+- Cung cấp thống kê doanh thu (Get Revenue Statistics):
+  - Cung cấp số liệu thống kê về xu hướng doanh thu (ví dụ: doanh thu trung bình, tăng trưởng).
+  - Chỉ admin được phép truy cập.
+
+- Tính doanh thu của giảng viên (Get Instructor Revenue):
+  - Tính tổng doanh thu từ các khóa học của một giảng viên.
+  - Chỉ giảng viên hoặc admin được phép truy cập.
+
+- Lấy khóa học có doanh thu cao nhất (Get Highest Revenue Courses):
+  - Lấy danh sách khóa học được sắp xếp theo doanh thu.
+  - Hỗ trợ truy cập công khai, hỗ trợ phân trang.
+
+2. Tech Stack
+Để triển khai các API này, tôi đề xuất tech stack sau, đồng bộ với các Model trước đó, không sử dụng Redis, hỗ trợ transaction và queue:
+
+- Backend:
+  - Ngôn ngữ: TypeScript với Node.js (đảm bảo type safety và dễ bảo trì).
+  - Framework: Express.js (nhẹ, linh hoạt, phổ biến cho REST API).
+  - ORM/Database Driver:
+    - Sequenlize để quản lý truy vấn MySQL, hỗ trợ transaction.
+    - mysql2 cho kết nối MySQL.
+  - Validation:
+    - joi: Kiểm tra dữ liệu đầu vào.
+  - Authentication:
+    - jsonwebtoken: Tạo và xác thực JWT (cho các API yêu cầu admin/instructor/student).
+  - Payment Integration:
+    - stripe: Tích hợp cổng thanh toán Stripe hoặc PayPal.   
+  - Documentation:
+    - swagger-jsdoc và swagger-ui-express: Tạo tài liệu OpenAPI.
+    - express-openapi-validator: Validate request/response theo spec.
+
+- Database:
+  - MySQL: Dựa trên schema đã cung cấp (payments, refunds).
+
+
+3. Danh sách API chi tiết
+Dưới đây là danh sách các API cho Payment Model, bao gồm endpoint, phương thức HTTP, mô tả, yêu cầu xác thực, và các lưu ý tối ưu hóa.
+
+- Endpoint: /api/payments
+  - Method: POST
+  - Description: Tạo thanh toán mới
+  - Auth: JWT (Student)
+  - Notes: Tích hợp Stripe, sử dụng transaction để đồng bộ payment và enrollment.
+
+- Endpoint: /api/payments/:id
+  - Method: GET
+  - Description: Lấy thông tin thanh toán theo ID
+  - Auth: JWT (Student, Instructor, hoặc Admin)
+  - Notes: Tối ưu bằng cách chọn cột cụ thể.
+
+- Endpoint: /api/payments/user/:userId
+  - Method: GET
+  - Description: Lấy danh sách thanh toán của học viên
+  - Auth: JWT (Student hoặc Admin)
+  - Notes: Hỗ trợ phân trang, tối ưu bằng cách chọn cột cụ thể.
+
+- Endpoint: /api/payments/course/:courseId
+  - Method: GET
+  - Description: Lấy danh sách thanh toán của khóa học
+  - Auth: JWT (Instructor hoặc Admin)
+  - Notes: Hỗ trợ phân trang, tối ưu bằng cách chọn cột cụ thể.
+
+- Endpoint: /api/payments/:id/status
+  - Method: PUT
+  - Description: Cập nhật trạng thái thanh toán
+  - Auth: JWT (Admin)
+  - Notes: Kiểm tra trạng thái hợp lệ.
+
+- Endpoint: /api/payments/:id/refund
+  - Method: POST
+  - Description: Xử lý hoàn tiền
+  - Auth: JWT (Student hoặc Admin)
+  - Notes: Kiểm tra thanh toán hợp lệ, tích hợp Stripe/PayPal, sử dụng transaction để đồng bộ payment và refund.
+
+- Endpoint: /api/payments/revenue/total
+  - Method: GET
+  - Description: Tính tổng doanh thu
+  - Auth: JWT (Admin)
+  - Notes: Tối ưu bằng cách sử dụng JOIN hiệu quả.
+
+- Endpoint: /api/payments/revenue/time
+  - Method: GET
+  - Description: Tính doanh thu theo thời gian
+  - Auth: JWT (Admin)
+  - Notes: Hỗ trợ lọc theo ngày/tháng/năm, tối ưu bằng cách sử dụng JOIN hiệu quả.
+
+- Endpoint: /api/payments/revenue/statistics
+  - Method: GET
+  - Description: Cung cấp thống kê doanh thu
+  - Auth: JWT (Admin)
+  - Notes: Tối ưu bằng cách sử dụng JOIN hiệu quả.
+
+- Endpoint: /api/payments/instructor/:instructorId/revenue
+  - Method: GET
+  - Description: Tính doanh thu của giảng viên
+  - Auth: JWT (Instructor hoặc Admin)
+  - Notes: Tối ưu bằng cách sử dụng JOIN hiệu quả.
+
+- Endpoint: /api/payments/revenue/highest
+  - Method: GET
+  - Description: Lấy khóa học có doanh thu cao nhất
+  - Auth: None
+  - Notes: Hỗ trợ phân trang, tối ưu bằng cách sử dụng JOIN hiệu quả.
+
+4. Các bước triển khai chi tiết
+
+4.1. Tạo thanh toán mới (/api/payments)
+- Input: { user_id, course_id, amount, currency, payment_method }.
+- Xử lý:
+  - Validate input bằng zod (user_id, course_id, amount, payment_method bắt buộc).
+  - Áp dụng rate limiting (express-rate-limit) để giới hạn số yêu cầu từ cùng một user_id trong khoảng thời gian (ví dụ: 5 yêu cầu/phút).
+  - Kiểm tra khóa học tồn tại và học viên chưa đăng ký.
+  - Bắt đầu transaction:
+    - Tích hợp Stripe/PayPal để xử lý thanh toán.
+    - Thêm bản ghi vào bảng payments (createPayment).
+    - Nếu thanh toán thành công (status = completed), thêm bản ghi vào bảng enrollments để mở khóa học.
+    - Nếu thanh toán thất bại, rollback transaction.
+  - Commit transaction nếu tất cả bước thành công.
+- Output: { id, user_id, course_id, amount, currency, payment_method, transaction_id, status }.
+
+4.2. Lấy thông tin thanh toán (/api/payments/:id)
+- Input: :id.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền (học viên, giảng viên sở hữu khóa học, hoặc admin).
+  - Truy vấn bảng payments để lấy thông tin thanh toán (getPaymentById).
+  - Chọn cột cụ thể để giảm tải xử lý.
+- Output: { id, user_id, course_id, amount, currency, payment_method, transaction_id, status }.
+
+4.3. Lấy danh sách thanh toán của học viên (/api/payments/user/:userId)
+- Input: :userId, Query params { page, limit }.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền (học viên hoặc admin).
+  - Truy vấn bảng payments để lấy danh sách thanh toán (getUserPayments).
+  - Hỗ trợ phân trang.
+  - Chọn cột cụ thể để giảm tải xử lý.
+- Output: { payments: [{ id, user_id, course_id, amount, currency, payment_method, status }], total: number }.
+
+4.4. Lấy danh sách thanh toán của khóa học (/api/payments/course/:courseId)
+- Input: :courseId, Query params { page, limit }.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền (giảng viên sở hữu khóa học hoặc admin).
+  - Truy vấn bảng payments để lấy danh sách thanh toán (getCoursePayments).
+  - Hỗ trợ phân trang.
+  - Chọn cột cụ thể để giảm tải xử lý.
+- Output: { payments: [{ id, user_id, course_id, amount, currency, payment_method, status }], total: number }.
+
+4.5. Cập nhật trạng thái thanh toán (/api/payments/:id/status)
+- Input: { status }.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền admin.
+  - Validate input bằng zod (status phải là pending, completed, failed, refunded).
+  - Cập nhật bản ghi trong bảng payments (updatePaymentStatus).
+- Output: { message: 'Payment status updated' }.
+
+4.6. Xử lý hoàn tiền (/api/payments/:id/refund)
+- Input: { reason }.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền (học viên hoặc admin).
+  - Kiểm tra thanh toán hợp lệ (status = completed, chưa được hoàn tiền).
+  - Bắt đầu transaction:
+    - Tích hợp Stripe/PayPal để xử lý hoàn tiền.
+    - Thêm bản ghi vào bảng refunds (processRefund).
+    - Cập nhật trạng thái thanh toán thành refunded.
+  - Commit transaction nếu tất cả bước thành công, rollback nếu có lỗi.
+- Output: { id, payment_id, amount, reason, status }.
+
+4.7. Tính tổng doanh thu (/api/payments/revenue/total)
+- Input: None.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền admin.
+  - Truy vấn bảng payments để tính tổng doanh thu (getTotalRevenue).
+  - Sử dụng JOIN hiệu quả để lấy dữ liệu.
+- Output: { total_revenue: number }.
+
+4.8. Tính doanh thu theo thời gian (/api/payments/revenue/time)
+- Input: Query params { start_date, end_date, period }.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền admin.
+  - Truy vấn bảng payments để tính doanh thu theo khoảng thời gian (getRevenueByTime).
+  - Sử dụng JOIN hiệu quả để lấy dữ liệu.
+- Output: { revenue: [{ period, amount }] }.
+
+4.9. Cung cấp thống kê doanh thu (/api/payments/revenue/statistics)
+- Input: Query params { start_date, end_date }.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền admin.
+  - Truy vấn bảng payments để tính thống kê doanh thu (getRevenueStatistics).
+  - Sử dụng JOIN hiệu quả để lấy dữ liệu.
+- Output: { statistics: { total: number, average: number, growth: number } }.
+
+4.10. Tính doanh thu của giảng viên (/api/payments/instructor/:instructorId/revenue)
+- Input: :instructorId.
+- Xử lý:
+  - Xác thực JWT, kiểm tra quyền (giảng viên hoặc admin).
+  - Truy vấn bảng payments và courses để tính doanh thu (getInstructorRevenue).
+  - Sử dụng JOIN hiệu quả để lấy dữ liệu.
+- Output: { instructor_id, revenue: number }.
+
+4.11. Lấy khóa học có doanh thu cao nhất (/api/payments/revenue/highest)
+- Input: Query params { page, limit }.
+- Xử lý:
+  - Truy vấn bảng payments và courses để lấy khóa học theo doanh thu (getHighestRevenueCourses).
+  - Hỗ trợ phân trang.
+  - Sử dụng JOIN hiệu quả để lấy dữ liệu.
+- Output: { courses: [{ course_id, title, revenue }], total: number }.
+
+5. Nguyên tắc thiết kế cấu trúc dự án
+
+- Modularity: Tách biệt các thành phần (routes, controllers, services, models) để dễ bảo trì.
+- Scalability: Cấu trúc hỗ trợ thêm model và tính năng mới mà không làm rối codebase.
+- Separation of Concerns: Mỗi lớp (layer) xử lý một trách nhiệm cụ thể (routes định tuyến, controllers xử lý logic HTTP, services xử lý logic nghiệp vụ, models tương tác với database).
+- Reusability: Các thành phần như middleware, utilities được tái sử dụng.
+- Testing: Hỗ trợ viết unit test và integration test dễ dàng.
+- Configuration: Tách biệt cấu hình môi trường (development, production) để dễ triển khai.
+
+6. Nguyên tắc khi kết hợp Swagger
+
+- Mục tiêu: Swagger (OpenAPI Specification) phải phản ánh chính xác các endpoint, request/response schema, và trạng thái của API.
+- Nguyên tắc:
+  - Tự động hóa tài liệu: Sử dụng các thư viện như swagger-jsdoc hoặc swagger-ui-express để tạo tài liệu Swagger trực tiếp từ mã nguồn (comments JSDoc trong Express.js).
+  - Đồng bộ hóa với mã: Đảm bảo mọi thay đổi trong API (thêm endpoint, cập nhật schema) được phản ánh ngay lập tức trong tài liệu Swagger.
+  - Xác thực schema: Sử dụng các công cụ như express-openapi-validator để kiểm tra tính hợp lệ của request/response so với định nghĩa trong Swagger.

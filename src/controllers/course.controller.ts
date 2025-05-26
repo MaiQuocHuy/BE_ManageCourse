@@ -255,13 +255,14 @@ class CourseController {
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
       const category_id = req.query.category_id as string | undefined;
-      const is_published = req.query.is_published === "false" ? false : true;
-      const is_approved = req.query.is_approved === "true" ? true : false;
+      const category = category_id;
+      const is_published = req.query.is_published === 'false' ? false : true;
+      const is_approved = req.query.is_approved === 'true' ? true : false;
 
       const result = await courseService.getCourses({
         page,
         limit,
-        category_id,
+        category,
         is_published,
         is_approved,
       });
@@ -334,17 +335,18 @@ class CourseController {
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
       const category_id = req.query.category_id as string | undefined;
-      const is_published = req.query.is_published === "false" ? false : true;
+      const category = category_id;
+      const is_published = req.query.is_published === 'false' ? false : true;
 
       if (!keyword) {
-        return next(new Error("Keyword is required for search"));
+        return next(new Error('Keyword is required for search'));
       }
 
       const result = await courseService.searchCourses({
         keyword,
         page,
         limit,
-        category_id,
+        category,
         is_published,
       });
 

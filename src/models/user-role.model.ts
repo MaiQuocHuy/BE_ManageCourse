@@ -45,7 +45,7 @@ UserRole.init(
       allowNull: false,
       references: {
         model: User,
-        key: "id",
+        key: 'id',
       },
     },
     role: {
@@ -55,9 +55,19 @@ UserRole.init(
   },
   {
     sequelize,
-    tableName: "user_roles",
+    tableName: 'user_roles',
     timestamps: false,
     underscored: true,
+    indexes: [
+      {
+        fields: ['user_id'],
+        name: 'user_roles_user_id_idx',
+      },
+      {
+        fields: ['role'],
+        name: 'user_roles_role_idx',
+      },
+    ],
   }
 );
 

@@ -47,34 +47,41 @@ class User
   public static associate(models: any): void {
     // User has many UserRoles
     User.hasMany(models.UserRole, {
-      foreignKey: "user_id",
-      as: "roles",
+      foreignKey: 'user_id',
+      as: 'roles',
     });
 
     // User has many RefreshTokens
     User.hasMany(models.RefreshToken, {
-      foreignKey: "user_id",
-      as: "refreshTokens",
+      foreignKey: 'user_id',
+      as: 'refreshTokens',
     });
 
     // User has many Courses (as instructor)
     User.hasMany(models.Course, {
-      foreignKey: "instructor_id",
-      as: "courses",
+      foreignKey: 'instructor_id',
+      as: 'courses',
     });
 
     // User has many Enrollments (as student)
     User.hasMany(models.Enrollment, {
-      foreignKey: "user_id",
-      as: "enrollments",
-      onDelete: "CASCADE",
+      foreignKey: 'user_id',
+      as: 'enrollments',
+      onDelete: 'CASCADE',
     });
 
     // User has many LessonCompletions
     User.hasMany(models.LessonCompletion, {
-      foreignKey: "user_id",
-      as: "completedLessons",
-      onDelete: "CASCADE",
+      foreignKey: 'user_id',
+      as: 'completedLessons',
+      onDelete: 'CASCADE',
+    });
+
+    // User has many Reviews
+    User.hasMany(models.Review, {
+      foreignKey: 'user_id',
+      as: 'reviews',
+      onDelete: 'CASCADE',
     });
   }
 }
@@ -127,9 +134,23 @@ User.init(
   },
   {
     sequelize,
-    tableName: "users",
+    tableName: 'users',
     timestamps: true,
     underscored: true,
+    indexes: [
+      {
+        fields: ['is_active'],
+        name: 'users_is_active_idx',
+      },
+      {
+        fields: ['created_at'],
+        name: 'users_created_at_idx',
+      },
+      {
+        fields: ['name'],
+        name: 'users_name_idx',
+      },
+    ],
     hooks: {
       beforeCreate: async (user: User) => {
         if (user.password) {
@@ -138,7 +159,7 @@ User.init(
         }
       },
       beforeUpdate: async (user: User) => {
-        if (user.changed("password")) {
+        if (user.changed('password')) {
           const salt = await bcrypt.genSalt(10);
           user.password = await bcrypt.hash(user.password, salt);
         }

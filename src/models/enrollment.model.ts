@@ -59,19 +59,19 @@ Enrollment.init(
       type: DataTypes.STRING(20),
       allowNull: false,
       references: {
-        model: "users",
-        key: "id",
+        model: 'users',
+        key: 'id',
       },
-      onDelete: "CASCADE",
+      onDelete: 'CASCADE',
     },
     course_id: {
       type: DataTypes.STRING(20),
       allowNull: false,
       references: {
-        model: "courses",
-        key: "id",
+        model: 'courses',
+        key: 'id',
       },
-      onDelete: "CASCADE",
+      onDelete: 'CASCADE',
     },
     created_at: {
       type: DataTypes.DATE,
@@ -86,16 +86,28 @@ Enrollment.init(
   },
   {
     sequelize,
-    modelName: "Enrollment",
-    tableName: "enrollments",
+    modelName: 'Enrollment',
+    tableName: 'enrollments',
     timestamps: true,
-    createdAt: "created_at",
-    updatedAt: "updated_at",
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     indexes: [
       {
         unique: true,
-        fields: ["user_id", "course_id"],
-        name: "unique_user_course_enrollment",
+        fields: ['user_id', 'course_id'],
+        name: 'unique_user_course_enrollment',
+      },
+      {
+        fields: ['user_id'],
+        name: 'enrollments_user_id_idx',
+      },
+      {
+        fields: ['course_id'],
+        name: 'enrollments_course_id_idx',
+      },
+      {
+        fields: ['created_at'],
+        name: 'enrollments_created_at_idx',
       },
     ],
   }

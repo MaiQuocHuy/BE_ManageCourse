@@ -65,10 +65,10 @@ Section.init(
       type: DataTypes.STRING(20),
       allowNull: false,
       references: {
-        model: "courses",
-        key: "id",
+        model: 'courses',
+        key: 'id',
       },
-      onDelete: "CASCADE",
+      onDelete: 'CASCADE',
     },
     title: {
       type: DataTypes.STRING(255),
@@ -96,11 +96,21 @@ Section.init(
   },
   {
     sequelize,
-    modelName: "Section",
-    tableName: "course_sections",
+    modelName: 'Section',
+    tableName: 'course_sections',
     timestamps: true,
-    createdAt: "created_at",
-    updatedAt: "updated_at",
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+    indexes: [
+      {
+        fields: ['course_id'],
+        name: 'sections_course_id_idx',
+      },
+      {
+        fields: ['course_id', 'order_index'],
+        name: 'sections_course_order_idx',
+      },
+    ],
   }
 );
 

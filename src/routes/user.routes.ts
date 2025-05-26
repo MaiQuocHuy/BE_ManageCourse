@@ -81,10 +81,24 @@ router.post(
  *               email:
  *                 type: string
  *                 format: email
- *                 example: admin@example.com
  *               password:
  *                 type: string
- *                 example: admin123123@
+ *           examples:
+ *             admin:
+ *               summary: Admin credentials
+ *               value:
+ *                 email: admin@example.com
+ *                 password: admin123123@
+ *             instructor:
+ *               summary: Instructor credentials
+ *               value:
+ *                 email: instructor@example.com
+ *                 password: instructor123@
+ *             student:
+ *               summary: Student credentials
+ *               value:
+ *                 email: student@example.com
+ *                 password: student123@
  *     responses:
  *       200:
  *         description: Logged in successfully
@@ -93,7 +107,6 @@ router.post(
  *       500:
  *         description: Server error
  */
-
 router.post("/login", validateRequest(loginSchema), userController.login);
 
 /**

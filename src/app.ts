@@ -7,6 +7,8 @@ import courseRoutes from "./routes/course.routes";
 import sectionRoutes from "./routes/section.routes";
 import lessonRoutes from "./routes/lesson.routes";
 import enrollmentRoutes from "./routes/enrollment.routes";
+import paymentRoutes from "./routes/payment.routes";
+import reviewRoutes from "./routes/review.routes";
 import { errorHandler } from "./middleware/error.middleware";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
@@ -91,12 +93,14 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/sections", sectionRoutes);
 app.use("/api/lessons", lessonRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 // Error handling middleware must be after all routes
 app.use(errorHandler);
 
 app.listen(port, () => {
-  return console.log(`Express is listening at http://localhost:${port}`);
+  return console.log(`Express is listening at http://localhost:${port}/api-docs`);
 });
 
 export default app;

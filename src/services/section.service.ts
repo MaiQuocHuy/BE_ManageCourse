@@ -1,9 +1,8 @@
-import Section from "../models/section.model";
-import Course from "../models/course.model";
-import User from "../models/user.model";
-import { ApiError } from "../utils/api-error";
-import sequelize from "../config/database";
-import { Transaction, Op } from "sequelize";
+import { Transaction } from 'sequelize';
+import { sectionRepository, courseRepository, userRepository } from '../repositories';
+import Section from '../models/section.model';
+import { ApiError } from '../utils/api-error';
+import sequelize from '../config/database';
 
 interface SectionCreateData {
   course_id: string;
@@ -45,8 +44,8 @@ class SectionService {
 
       return;
     } catch (error) {
-      console.error("Error initializing section table:", error);
-      throw new ApiError(500, "Failed to initialize section table");
+      console.error('Error initializing section table:', error);
+      throw new ApiError(500, 'Failed to initialize section table');
     }
   }
 
@@ -56,85 +55,43 @@ class SectionService {
    * @param user_id - The ID of the user
    * @returns True if authorized, throws error if not
    */
-  private async checkCourseOwnership(
-    course_id: string,
-    user_id: string
-  ): Promise<boolean> {
-    const course = await Course.findByPk(course_id);
+  private async checkCourseOwnership(course_id: string, user_id: string): Promise<boolean> {
+    const course = await courseRepository.findById(course_id);
 
     if (!course) {
-      throw new ApiError(404, "Course not found");
+      throw new ApiError(404, 'Course not found');
     }
 
     if (course.instructor_id !== user_id) {
-      throw new ApiError(
-        403,
-        "You are not authorized to manage sections for this course"
-      );
+      throw new ApiError(403, 'You are not authorized to manage sections for this course');
     }
 
     return true;
   }
 
   /**
-   * Get the next order index for a new section in a course
-   * This method considers both course_id and existing section IDs
-   * @param course_id - The ID of the course
-   * @param transaction - Optional transaction
-   * @returns The next order index
-   */
-  private async getNextOrderIndex(
-    course_id: string,
-    transaction?: Transaction
-  ): Promise<number> {
-    const options = transaction ? { transaction } : {};
-
-    // Get all sections for this course
-    const sections = await Section.findAll({
-      where: { course_id },
-      order: [["order_index", "DESC"]],
-      ...options,
-    });
-
-    if (sections.length === 0) {
-      return 0; // First section in the course
-    }
-
-    // Find the highest order_index
-    let maxOrderIndex = 0;
-    for (const section of sections) {
-      if (section.order_index > maxOrderIndex) {
-        maxOrderIndex = section.order_index;
-      }
-    }
-
-    return maxOrderIndex + 1;
-  }
-
-  /**
    * Create a new section
    */
-  async createSection(
-    data: SectionCreateData,
-    user_id: string
-  ): Promise<Section> {
+  async createSection(data: SectionCreateData, user_id: string): Promise<Section> {
     const { course_id, title, description } = data;
     let { order_index } = data;
 
-    // Start a transaction
-    const transaction = await sequelize.transaction();
+    let transaction: Transaction | null = null;
 
     try {
+      // Start a transaction
+      transaction = await sequelize.transaction();
+
       // Check if user owns the course
       await this.checkCourseOwnership(course_id, user_id);
 
       // If order_index is not provided, get the next available index
       if (!order_index) {
-        order_index = await this.getNextOrderIndex(course_id, transaction);
+        order_index = await sectionRepository.getNextOrderIndex(course_id);
       }
 
-      // Create the section
-      const section = await Section.create(
+      // Create the section using repository
+      const section = await sectionRepository.create(
         {
           course_id,
           title,
@@ -146,11 +103,18 @@ class SectionService {
 
       // Commit the transaction
       await transaction.commit();
+      transaction = null;
 
       return section;
     } catch (error) {
       // Rollback the transaction
-      await transaction.rollback();
+      if (transaction) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error('Transaction rollback failed:', rollbackError);
+        }
+      }
       throw error;
     }
   }
@@ -159,25 +123,10 @@ class SectionService {
    * Get a section by ID
    */
   async getSectionById(id: string): Promise<Section> {
-    const section = await Section.findByPk(id, {
-      include: [
-        {
-          model: Course,
-          as: "course",
-          attributes: ["id", "title", "instructor_id"],
-          include: [
-            {
-              model: User,
-              as: "instructor",
-              attributes: ["id", "name", "email"],
-            },
-          ],
-        },
-      ],
-    });
+    const section = await sectionRepository.findByIdWithDetails(id);
 
     if (!section) {
-      throw new ApiError(404, "Section not found");
+      throw new ApiError(404, 'Section not found');
     }
 
     return section;
@@ -195,36 +144,14 @@ class SectionService {
     user_id: string,
     isAdmin: boolean = false
   ): Promise<boolean> {
-    const section = await this.getSectionById(section_id);
-    const course = section.get("course") as any;
-
-    // Admin always has access
-    if (isAdmin) {
-      return true;
-    }
-
-    // Check if user is the instructor of the course
-    if (course.instructor_id === user_id) {
-      return true;
-    }
-
-    // TODO: Check if user is enrolled in the course
-    // This would be implemented when enrollment functionality is added
-
-    throw new ApiError(403, "You do not have access to this section");
+    return await sectionRepository.canUserAccessSection(section_id, user_id);
   }
 
   /**
    * Get all sections for a course
    */
   async getCourseSections(course_id: string): Promise<Section[]> {
-    const sections = await Section.findAll({
-      where: { course_id },
-      order: [["order_index", "ASC"]],
-      attributes: ["id", "course_id", "title", "description", "order_index"],
-    });
-
-    return sections;
+    return await sectionRepository.findByCourseId(course_id);
   }
 
   /**
@@ -246,12 +173,15 @@ class SectionService {
       await this.checkCourseOwnership(section.course_id, user_id);
     }
 
-    // Update the section
-    await section.update({
-      title: title ? title : section.title,
-      description: description ? description : section.description,
-      // order_index: order_index ? order_index : section.order_index,
+    // Update the section using repository
+    const updatedSection = await sectionRepository.updateById(id, {
+      title: title !== undefined ? title : section.title,
+      description: description !== undefined ? description : section.description,
     });
+
+    if (!updatedSection) {
+      throw new ApiError(404, 'Section not found');
+    }
 
     return this.getSectionById(id);
   }
@@ -259,11 +189,7 @@ class SectionService {
   /**
    * Delete a section
    */
-  async deleteSection(
-    id: string,
-    user_id: string,
-    isAdmin: boolean = false
-  ): Promise<void> {
+  async deleteSection(id: string, user_id: string, isAdmin: boolean = false): Promise<void> {
     // Get the section
     const section = await this.getSectionById(id);
 
@@ -272,45 +198,40 @@ class SectionService {
       await this.checkCourseOwnership(section.course_id, user_id);
     }
 
-    // Start a transaction
-    const transaction = await sequelize.transaction();
+    let transaction: Transaction | null = null;
 
     try {
+      // Start a transaction
+      transaction = await sequelize.transaction();
+
       // Get the order_index of the section to be deleted
       const deletedSectionOrderIndex = section.order_index;
 
-      // Delete the section
-      await section.destroy({ transaction });
+      // Delete the section using repository
+      await sectionRepository.deleteById(id, { transaction });
 
       // TODO: Delete related lessons when Lesson model is implemented
-      // await Lesson.destroy({
-      //   where: { section_id: id },
-      //   transaction,
-      // });
+      // This would be handled by the cascade delete in the database
 
-      // Get all remaining sections in the same course with higher order_index
-      const sectionsToUpdate = await Section.findAll({
-        where: {
-          course_id: section.course_id,
-          order_index: { [Op.gt]: deletedSectionOrderIndex },
-        },
-        order: [["order_index", "ASC"]],
-        transaction,
-      });
-
-      // Update the order_index of each remaining section
-      for (const sectionToUpdate of sectionsToUpdate) {
-        await sectionToUpdate.update(
-          { order_index: sectionToUpdate.order_index - 1 },
-          { transaction }
-        );
-      }
+      // Reorder sections after deletion
+      await sectionRepository.reorderSections(
+        section.course_id,
+        deletedSectionOrderIndex,
+        transaction
+      );
 
       // Commit the transaction
       await transaction.commit();
+      transaction = null;
     } catch (error) {
       // Rollback the transaction
-      await transaction.rollback();
+      if (transaction) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error('Transaction rollback failed:', rollbackError);
+        }
+      }
       throw error;
     }
   }
@@ -329,55 +250,52 @@ class SectionService {
       await this.checkCourseOwnership(course_id, user_id);
     }
 
-    // Start a transaction
-    const transaction = await sequelize.transaction();
+    let transaction: Transaction | null = null;
 
     try {
-      // Get all existing sections for this course
-      const existingSections = await Section.findAll({
-        where: { course_id },
-        transaction,
-      });
+      // Start a transaction
+      transaction = await sequelize.transaction();
+
+      // Get all existing sections for this course using repository
+      const existingSections = await sectionRepository.findByCourseId(course_id, { transaction });
 
       // Create a map of section IDs to their current order_index
       const sectionMap = new Map<string, number>();
-      existingSections.forEach((section) => {
+      existingSections.forEach(section => {
         sectionMap.set(section.id, section.order_index);
       });
 
       // Validate that all sections in the request exist in the course
       for (const item of sections) {
         if (!sectionMap.has(item.id)) {
-          throw new ApiError(
-            404,
-            `Section with ID ${item.id} not found in this course`
-          );
+          throw new ApiError(404, `Section with ID ${item.id} not found in this course`);
         }
       }
 
       // Check for duplicate order_index values
-      const orderIndices = sections.map((item) => item.order_index);
+      const orderIndices = sections.map(item => item.order_index);
       const uniqueOrderIndices = new Set(orderIndices);
       if (orderIndices.length !== uniqueOrderIndices.size) {
-        throw new ApiError(400, "Duplicate order_index values are not allowed");
+        throw new ApiError(400, 'Duplicate order_index values are not allowed');
       }
 
-      // Update each section's order_index
+      // Update each section's order_index using repository
       for (const item of sections) {
-        const section = existingSections.find((s) => s.id === item.id);
-        if (section) {
-          await section.update(
-            { order_index: item.order_index },
-            { transaction }
-          );
-        }
+        await sectionRepository.updateOrder(item.id, item.order_index, transaction);
       }
 
       // Commit the transaction
       await transaction.commit();
+      transaction = null;
     } catch (error) {
       // Rollback the transaction
-      await transaction.rollback();
+      if (transaction) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error('Transaction rollback failed:', rollbackError);
+        }
+      }
       throw error;
     }
   }

@@ -1,12 +1,17 @@
-import Course from "../models/course.model";
-import CourseCategory from "../models/course-category.model";
-import Category from "../models/category.model";
-import User from "../models/user.model";
-import { ApiError } from "../utils/api-error";
-import { Op } from "sequelize";
-import sequelize from "../config/database";
-import { v2 as cloudinary } from "cloudinary";
-import fs from "fs";
+import { Transaction } from 'sequelize';
+import { v2 as cloudinary } from 'cloudinary';
+import fs from 'fs';
+import {
+  courseRepository,
+  categoryRepository,
+  userRepository,
+  enrollmentRepository,
+} from '../repositories';
+import Course from '../models/course.model';
+import CourseCategory from '../models/course-category.model';
+import Category from '../models/category.model';
+import { ApiError } from '../utils/api-error';
+import sequelize from '../config/database';
 
 // Configure Cloudinary
 cloudinary.config({
@@ -39,9 +44,13 @@ interface CourseUpdateData {
 interface PaginationOptions {
   page?: number;
   limit?: number;
-  category_id?: string;
+  category?: string;
   is_published?: boolean;
   is_approved?: boolean;
+  instructor_id?: string;
+  price_min?: number;
+  price_max?: number;
+  level?: string;
 }
 
 interface SearchOptions extends PaginationOptions {
@@ -83,8 +92,8 @@ class CourseService {
 
       return;
     } catch (error) {
-      console.error("Error initializing course tables:", error);
-      throw new ApiError(500, "Failed to initialize course tables");
+      console.error('Error initializing course tables:', error);
+      throw new ApiError(500, 'Failed to initialize course tables');
     }
   }
 
@@ -96,7 +105,7 @@ class CourseService {
   ): Promise<{ url: string; public_id: string }> {
     try {
       const result = await cloudinary.uploader.upload(file.path, {
-        folder: "course_thumbnails",
+        folder: 'course_thumbnails',
         use_filename: true,
         unique_filename: true,
       });
@@ -113,7 +122,7 @@ class CourseService {
       if (file.path && fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
       }
-      throw new ApiError(500, "Error uploading thumbnail to cloud storage");
+      throw new ApiError(500, 'Error uploading thumbnail to cloud storage');
     }
   }
 
@@ -124,7 +133,7 @@ class CourseService {
     try {
       await cloudinary.uploader.destroy(public_id);
     } catch (error) {
-      console.error("Error deleting thumbnail from Cloudinary:", error);
+      console.error('Error deleting thumbnail from Cloudinary:', error);
       // We don't throw here to avoid blocking the main operation
     }
   }
@@ -144,10 +153,12 @@ class CourseService {
       categories = [],
     } = data;
 
-    // Start a transaction
-    const transaction = await sequelize.transaction();
+    let transaction: Transaction | null = null;
 
     try {
+      // Start a transaction
+      transaction = await sequelize.transaction();
+
       // Upload thumbnail if provided
       let thumbnailUrl = null;
       let thumbnailPublicId = null;
@@ -158,8 +169,8 @@ class CourseService {
         thumbnailPublicId = uploadResult.public_id;
       }
 
-      // Create the course
-      const course = await Course.create(
+      // Create the course using repository
+      const course = await courseRepository.create(
         {
           title,
           description: description || null,
@@ -175,7 +186,7 @@ class CourseService {
 
       // Associate categories if provided
       if (categories && categories.length > 0) {
-        const categoryAssociations = categories.map((category_id) => ({
+        const categoryAssociations = categories.map(category_id => ({
           course_id: course.id,
           category_id,
         }));
@@ -185,12 +196,19 @@ class CourseService {
 
       // Commit the transaction
       await transaction.commit();
+      transaction = null;
 
-      // Return the created course with categories
-      return this.getCourseById(course.id);
+      // Return the created course with categories using repository
+      return await this.getCourseById(course.id);
     } catch (error) {
       // Rollback the transaction
-      await transaction.rollback();
+      if (transaction) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error('Transaction rollback failed:', rollbackError);
+        }
+      }
       throw error;
     }
   }
@@ -199,23 +217,10 @@ class CourseService {
    * Get a course by ID
    */
   async getCourseById(id: string): Promise<Course> {
-    const course = await Course.findByPk(id, {
-      include: [
-        {
-          model: Category,
-          as: "categories",
-          through: { attributes: [] }, // Exclude junction table attributes
-        },
-        {
-          model: User,
-          as: "instructor",
-          attributes: ["id", "name", "email", "profile_thumbnail"],
-        },
-      ],
-    });
+    const course = await courseRepository.findByIdWithDetails(id);
 
     if (!course) {
-      throw new ApiError(404, "Course not found");
+      throw new ApiError(404, 'Course not found');
     }
 
     return course;
@@ -224,25 +229,22 @@ class CourseService {
   /**
    * Update a course
    */
-  async updateCourse(
-    id: string,
-    data: CourseUpdateData,
-    currentUserId: string
-  ): Promise<Course> {
+  async updateCourse(id: string, data: CourseUpdateData, currentUserId: string): Promise<Course> {
     const course = await this.getCourseById(id);
 
     // Check if the user is the instructor of the course
     if (course.instructor_id !== currentUserId) {
-      throw new ApiError(403, "You are not authorized to update this course");
+      throw new ApiError(403, 'You are not authorized to update this course');
     }
 
-    const { title, description, price, thumbnail, is_published, categories } =
-      data;
+    const { title, description, price, thumbnail, is_published, categories } = data;
 
-    // Start a transaction
-    const transaction = await sequelize.transaction();
+    let transaction: Transaction | null = null;
 
     try {
+      // Start a transaction
+      transaction = await sequelize.transaction();
+
       // Upload new thumbnail if provided
       let thumbnailUrl = course.thumbnail;
       let thumbnailPublicId = course.thumbnail_public_id;
@@ -259,18 +261,17 @@ class CourseService {
         thumbnailPublicId = uploadResult.public_id;
       }
 
-      // Update the course
-      await course.update(
+      // Update the course using repository
+      await courseRepository.update(
         {
           title: title !== undefined ? title : course.title,
-          description:
-            description !== undefined ? description : course.description,
+          description: description !== undefined ? description : course.description,
           price: price !== undefined ? price : course.price,
           thumbnail: thumbnailUrl,
           thumbnail_public_id: thumbnailPublicId,
-          is_published:
-            is_published !== undefined ? is_published : course.is_published,
+          is_published: is_published !== undefined ? is_published : course.is_published,
         },
+        { id },
         { transaction }
       );
 
@@ -284,7 +285,7 @@ class CourseService {
 
         // Create new associations
         if (categories.length > 0) {
-          const categoryAssociations = categories.map((category_id) => ({
+          const categoryAssociations = categories.map(category_id => ({
             course_id: id,
             category_id,
           }));
@@ -297,12 +298,19 @@ class CourseService {
 
       // Commit the transaction
       await transaction.commit();
+      transaction = null;
 
       // Return the updated course with categories
-      return this.getCourseById(id);
+      return await this.getCourseById(id);
     } catch (error) {
       // Rollback the transaction
-      await transaction.rollback();
+      if (transaction) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error('Transaction rollback failed:', rollbackError);
+        }
+      }
       throw error;
     }
   }
@@ -315,26 +323,35 @@ class CourseService {
 
     // Check if the user is the instructor of the course
     if (course.instructor_id !== currentUserId) {
-      throw new ApiError(403, "You are not authorized to delete this course");
+      throw new ApiError(403, 'You are not authorized to delete this course');
     }
 
-    // Start a transaction
-    const transaction = await sequelize.transaction();
+    let transaction: Transaction | null = null;
 
     try {
+      // Start a transaction
+      transaction = await sequelize.transaction();
+
       // Delete thumbnail from Cloudinary if exists
       if (course.thumbnail_public_id) {
         await this.deleteThumbnail(course.thumbnail_public_id);
       }
 
-      // Delete the course (cascade will delete course_categories)
-      await course.destroy({ transaction });
+      // Delete the course using repository (cascade will delete course_categories)
+      await courseRepository.deleteById(id, { transaction });
 
       // Commit the transaction
       await transaction.commit();
+      transaction = null;
     } catch (error) {
       // Rollback the transaction
-      await transaction.rollback();
+      if (transaction) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error('Transaction rollback failed:', rollbackError);
+        }
+      }
       throw error;
     }
   }
@@ -343,14 +360,15 @@ class CourseService {
    * Approve a course (admin only)
    */
   async approveCourse(id: string, is_approved: boolean): Promise<Course> {
-    const course = await this.getCourseById(id);
+    const course = await courseRepository.updateApprovalStatus(id, is_approved);
 
-    // Update the course approval status
-    await course.update({ is_approved });
+    if (!course) {
+      throw new ApiError(404, 'Course not found');
+    }
 
     // TODO: Send notification to instructor (could be implemented later)
 
-    return this.getCourseById(id);
+    return await this.getCourseById(id);
   }
 
   /**
@@ -365,16 +383,17 @@ class CourseService {
 
     // Check if the user is the instructor of the course
     if (course.instructor_id !== currentUserId) {
-      throw new ApiError(
-        403,
-        "You are not authorized to update this course's status"
-      );
+      throw new ApiError(403, "You are not authorized to update this course's status");
     }
 
-    // Update the course publication status
-    await course.update({ is_published });
+    // Update the course publication status using repository
+    const updatedCourse = await courseRepository.updateStatus(id, is_published);
 
-    return this.getCourseById(id);
+    if (!updatedCourse) {
+      throw new ApiError(404, 'Course not found');
+    }
+
+    return await this.getCourseById(id);
   }
 
   /**
@@ -384,125 +403,61 @@ class CourseService {
     options: PaginationOptions = {}
   ): Promise<{ courses: Course[]; total: number }> {
     const { page = 1, limit = 10 } = options;
-    const offset = (page - 1) * limit;
 
-    const { count, rows } = await Course.findAndCountAll({
-      where: { is_approved: false },
-      include: [
-        {
-          model: User,
-          as: "instructor",
-          attributes: ["id", "name", "email"],
-        },
-      ],
+    return await courseRepository.findByInstructorId('', {
+      page,
       limit,
-      offset,
-      order: [["created_at", "DESC"]],
+      status: 'pending', // This maps to is_approved = false
     });
-
-    return {
-      courses: rows,
-      total: count,
-    };
   }
 
   /**
    * Get categories for a course
    */
   async getCourseCategories(course_id: string): Promise<Category[]> {
-    const course = await Course.findByPk(course_id, {
-      include: [
-        {
-          model: Category,
-          as: "categories",
-          through: { attributes: [] }, // Exclude junction table attributes
-        },
-      ],
-    });
+    const course = await courseRepository.findByIdWithDetails(course_id);
 
     if (!course) {
-      throw new ApiError(404, "Course not found");
+      throw new ApiError(404, 'Course not found');
     }
 
     // Use type assertion to handle the categories association
-    const categories = course.get("categories") as Category[];
+    const categories = course.get('categories') as Category[];
     return categories || [];
   }
 
   /**
    * Get all courses with pagination and filtering
    */
-  async getCourses(
-    options: PaginationOptions = {}
-  ): Promise<{ courses: Course[]; total: number }> {
-    const {
-      page = 1,
-      limit = 10,
-      category_id,
-      is_published = true,
-      is_approved = false,
-    } = options;
-    const offset = (page - 1) * limit;
+  async getCourses(options: PaginationOptions = {}): Promise<{ courses: Course[]; total: number }> {
+    const { page = 1, limit = 10, category, is_published = true, is_approved = true } = options;
 
-    // Build where clause
-    const whereClause: any = {};
-
-    whereClause.is_published = is_published;
-
-    whereClause.is_approved = is_approved;
-
-    // If category_id is provided, we need to filter by category
-    if (category_id) {
-      const { count, rows } = await Course.findAndCountAll({
-        where: whereClause,
-        include: [
-          {
-            model: Category,
-            as: "categories",
-            through: { attributes: [] },
-            where: { id: category_id },
-          },
-          {
-            model: User,
-            as: "instructor",
-            attributes: ["id", "name", "email", "profile_thumbnail"],
-          },
-        ],
+    if (is_published && is_approved) {
+      // Get published and approved courses using repository
+      return await courseRepository.findPublishedCourses({
+        page,
         limit,
-        offset,
-        order: [["created_at", "DESC"]],
-        distinct: true, // Important for correct count with associations
+        category,
+        price_min: options.price_min,
+        price_max: options.price_max,
+        level: options.level,
+        instructor_id: options.instructor_id,
       });
-
-      return {
-        courses: rows,
-        total: count,
-      };
     } else {
-      // If no category_id, just get all courses
-      const { count, rows } = await Course.findAndCountAll({
-        where: whereClause,
-        include: [
-          {
-            model: Category,
-            as: "categories",
-            through: { attributes: [] },
-          },
-          {
-            model: User,
-            as: "instructor",
-            attributes: ["id", "name", "email", "profile_thumbnail"],
-          },
-        ],
+      // Use basic find for other cases
+      const result = await courseRepository.findAndCountAll({
+        where: {
+          is_published,
+          is_approved,
+        },
         limit,
-        offset,
-        order: [["created_at", "DESC"]],
-        distinct: true, // Important for correct count with associations
+        offset: (page - 1) * limit,
+        order: [['created_at', 'DESC']],
       });
 
       return {
-        courses: rows,
-        total: count,
+        courses: result.rows,
+        total: result.count,
       };
     }
   }
@@ -514,143 +469,106 @@ class CourseService {
     instructor_id: string,
     options: PaginationOptions = {}
   ): Promise<{ courses: Course[]; total: number }> {
-    const {
-      page = 1,
-      limit = 10,
-      is_published = true,
-      is_approved = true,
-    } = options;
-    const offset = (page - 1) * limit;
-
-    // Build where clause
-    const whereClause: any = { instructor_id };
-
-    // Filter by publication status if needed
-    whereClause.is_published = is_published;
-
-    // Filter by approval status if needed
-    whereClause.is_approved = is_approved;
-
-    const { count, rows } = await Course.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: Category,
-          as: "categories",
-          through: { attributes: [] },
-        },
-      ],
-      limit,
-      offset,
-      order: [["created_at", "DESC"]],
-      distinct: true,
-    });
-
-    return {
-      courses: rows,
-      total: count,
-    };
+    return await courseRepository.findByInstructorId(instructor_id, options);
   }
 
   /**
-   * Search courses by keyword
+   * Search courses
    */
-  async searchCourses(
-    options: SearchOptions
-  ): Promise<{ courses: Course[]; total: number }> {
+  async searchCourses(options: SearchOptions): Promise<{ courses: Course[]; total: number }> {
     const {
       keyword,
       page = 1,
       limit = 10,
-      category_id,
-      is_published = true,
+      category,
+      price_min,
+      price_max,
+      level,
+      instructor_id,
     } = options;
-    const offset = (page - 1) * limit;
 
-    // Build where clause
-    const whereClause: any = {
-      is_published,
-      is_approved: true,
-      [Op.or]: [
-        { title: { [Op.like]: `%${keyword}%` } },
-        { description: { [Op.like]: `%${keyword}%` } },
-      ],
-    };
-
-    // If category_id is provided, we need to filter by category
-    if (category_id) {
-      const { count, rows } = await Course.findAndCountAll({
-        where: whereClause,
-        include: [
-          {
-            model: Category,
-            as: "categories",
-            through: { attributes: [] },
-            where: { id: category_id },
-          },
-          {
-            model: User,
-            as: "instructor",
-            attributes: ["id", "name", "email", "profile_thumbnail"],
-          },
-        ],
-        limit,
-        offset,
-        order: [["created_at", "DESC"]],
-        distinct: true,
-      });
-
-      return {
-        courses: rows,
-        total: count,
-      };
-    } else {
-      // If no category_id, just search all courses
-      const { count, rows } = await Course.findAndCountAll({
-        where: whereClause,
-        include: [
-          {
-            model: Category,
-            as: "categories",
-            through: { attributes: [] },
-          },
-          {
-            model: User,
-            as: "instructor",
-            attributes: ["id", "name", "email", "profile_thumbnail"],
-          },
-        ],
-        limit,
-        offset,
-        order: [["created_at", "DESC"]],
-        distinct: true,
-      });
-
-      return {
-        courses: rows,
-        total: count,
-      };
-    }
+    return await courseRepository.searchCourses(
+      keyword,
+      {
+        categories: category ? [category] : undefined,
+        price_range: {
+          min: price_min,
+          max: price_max,
+        },
+        level,
+        instructor_id,
+      },
+      { page, limit }
+    );
   }
 
   /**
-   * Get recommended courses for a user
-   * This is a simple implementation that could be enhanced with more sophisticated recommendation algorithms
+   * Get recommended courses (simplified for now)
    */
   async getRecommendedCourses(
-    _user_id: string,
+    user_id: string,
     options: PaginationOptions = {}
   ): Promise<{ courses: Course[]; total: number }> {
-    const { page = 1, limit = 10 } = options;
+    // For now, return popular courses (featured courses)
+    const featuredCourses = await courseRepository.getFeaturedCourses(options.limit || 10);
 
-    // For now, just return popular courses (could be enhanced later)
-    // In a real implementation, this would use user's history, preferences, etc.
-    return this.getCourses({
-      page,
-      limit,
-      is_published: true,
-      is_approved: false,
-    });
+    return {
+      courses: featuredCourses,
+      total: featuredCourses.length,
+    };
+  }
+
+  /**
+   * Get course statistics
+   */
+  async getCourseStats(): Promise<{
+    totalCourses: number;
+    publishedCourses: number;
+    approvedCourses: number;
+    recentCourses: number;
+  }> {
+    return await courseRepository.getCourseStats();
+  }
+
+  /**
+   * Get courses with statistics (enrollment count, ratings)
+   */
+  async getCoursesWithStats(
+    options: PaginationOptions = {}
+  ): Promise<{ courses: any[]; total: number; page: number; limit: number }> {
+    return await courseRepository.findWithStats(options);
+  }
+
+  /**
+   * Check if user can access course
+   */
+  async canUserAccessCourse(course_id: string, user_id: string): Promise<boolean> {
+    return await courseRepository.canUserAccessCourse(course_id, user_id);
+  }
+
+  /**
+   * Get course progress for a user (if enrolled)
+   */
+  async getCourseProgress(course_id: string, user_id: string): Promise<any> {
+    // Check if user is enrolled
+    const isEnrolled = await enrollmentRepository.isUserEnrolled(user_id, course_id);
+
+    if (!isEnrolled) {
+      throw new ApiError(403, 'You must be enrolled in this course to view progress');
+    }
+
+    // Get enrollment details
+    const enrollment = await enrollmentRepository.findByUserAndCourse(user_id, course_id);
+
+    if (!enrollment) {
+      throw new ApiError(404, 'Enrollment not found');
+    }
+
+    return {
+      progress: 0, // Default progress since field doesn't exist in model
+      completion_date: null, // Default completion date
+      enrolled_at: enrollment.created_at || new Date(), // Use created_at instead
+    };
   }
 }
 
