@@ -106,9 +106,6 @@ router.put(
  *                 type: string
  *                 format: binary
  *                 description: Video file to upload to Cloudinary (duration will be automatically extracted)
- *               is_free:
- *                 type: boolean
- *                 description: Whether the lesson is free to access (defaults to false)
  *             required:
  *               - title
  *               - video
@@ -232,9 +229,6 @@ router.get(
  *                 type: string
  *                 format: binary
  *                 description: Video file to upload to Cloudinary (will replace existing video, duration will be automatically extracted)
- *               is_free:
- *                 type: boolean
- *                 description: Whether the lesson is free to access
  *     responses:
  *       200:
  *         description: Lesson updated successfully

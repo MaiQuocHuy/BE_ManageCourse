@@ -30,7 +30,7 @@ export class LessonRepository extends BaseRepository<Lesson> {
     let whereClause: any = { section_id };
 
     if (search) {
-      whereClause.title = { [Op.iLike]: `%${search}%` };
+      whereClause.title = { [Op.like]: `%${search}%` };
     }
 
     const { count, rows } = await this.findAndCountAll({
@@ -61,7 +61,7 @@ export class LessonRepository extends BaseRepository<Lesson> {
     let whereClause: any = {};
 
     if (search) {
-      whereClause.title = { [Op.iLike]: `%${search}%` };
+      whereClause.title = { [Op.like]: `%${search}%` };
     }
 
     const { count, rows } = await this.findAndCountAll({
@@ -108,27 +108,6 @@ export class LessonRepository extends BaseRepository<Lesson> {
             },
           ],
         },
-      ],
-    });
-  }
-
-  /**
-   * Find free lessons by course ID
-   */
-  async findFreeLessons(course_id: string): Promise<Lesson[]> {
-    return await this.findAll({
-      where: { is_free: true },
-      include: [
-        {
-          model: Section,
-          as: 'section',
-          where: { course_id },
-          attributes: ['id', 'title'],
-        },
-      ],
-      order: [
-        [{ model: Section, as: 'section' }, 'order_index', 'ASC'],
-        ['order_index', 'ASC'],
       ],
     });
   }
@@ -290,7 +269,6 @@ export class LessonRepository extends BaseRepository<Lesson> {
    */
   async getLessonStats(course_id?: string): Promise<{
     totalLessons: number;
-    freeLessons: number;
     totalDuration: number;
   }> {
     let whereClause: any = {};
@@ -310,18 +288,17 @@ export class LessonRepository extends BaseRepository<Lesson> {
 
     const lessons = await this.findAll({
       where: course_id ? {} : undefined,
-      attributes: ['id', 'is_free', 'duration'],
+      attributes: ['id', 'duration'],
       ...(course_id ? whereClause : {}),
     });
 
     const stats = lessons.reduce(
       (acc, lesson) => {
         acc.totalLessons++;
-        if (lesson.is_free) acc.freeLessons++;
         if (lesson.duration) acc.totalDuration += lesson.duration;
         return acc;
       },
-      { totalLessons: 0, freeLessons: 0, totalDuration: 0 }
+      { totalLessons: 0, totalDuration: 0 }
     );
 
     return stats;
@@ -340,8 +317,8 @@ export class LessonRepository extends BaseRepository<Lesson> {
     const { count, rows } = await this.findAndCountAll({
       where: {
         [Op.or]: [
-          { title: { [Op.iLike]: `%${searchTerm}%` } },
-          { content: { [Op.iLike]: `%${searchTerm}%` } },
+          { title: { [Op.like]: `%${searchTerm}%` } },
+          { content: { [Op.like]: `%${searchTerm}%` } },
         ],
       },
       include: [
@@ -384,7 +361,7 @@ export class LessonRepository extends BaseRepository<Lesson> {
     let whereClause: any = {};
 
     if (search) {
-      whereClause.title = { [Op.iLike]: `%${search}%` };
+      whereClause.title = { [Op.like]: `%${search}%` };
     }
 
     const { count, rows } = await this.findAndCountAll({

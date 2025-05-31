@@ -64,8 +64,8 @@ export const getUserPaymentsSchema = Joi.object({
 export const getCoursePaymentsSchema = Joi.object({
   params: Joi.object({
     courseId: Joi.string().required().messages({
-      "string.empty": "Course ID is required",
-      "any.required": "Course ID is required",
+      'string.empty': 'Course ID is required',
+      'any.required': 'Course ID is required',
     }),
   }),
   query: Joi.object({
@@ -75,10 +75,9 @@ export const getCoursePaymentsSchema = Joi.object({
       .valid(...Object.values(PaymentStatus))
       .optional()
       .messages({
-        "any.only": `Status must be one of: ${Object.values(PaymentStatus).join(
-          ", "
-        )}`,
+        'any.only': `Status must be one of: ${Object.values(PaymentStatus).join(', ')}`,
       }),
+    search: Joi.string().optional(),
   }),
 });
 
@@ -148,6 +147,9 @@ export const getRevenueStatisticsSchema = Joi.object({
   query: Joi.object({
     start_date: Joi.date().iso().optional(),
     end_date: Joi.date().iso().optional(),
+    instructor_id: Joi.string().optional().messages({
+      'string.base': 'Instructor ID must be a string',
+    }),
   }),
 });
 

@@ -2,6 +2,7 @@ import { Op, FindOptions, Transaction } from 'sequelize';
 import Section from '../models/section.model';
 import Lesson from '../models/lesson.model';
 import Course from '../models/course.model';
+import Enrollment from '../models/enrollment.model';
 import { BaseRepository } from './base.repository';
 
 interface PaginationOptions {
@@ -25,7 +26,7 @@ export class SectionRepository extends BaseRepository<Section> {
         {
           model: Lesson,
           as: 'lessons',
-          attributes: ['id', 'title', 'duration', 'order_index', 'video_url', 'is_preview'],
+          attributes: ['id', 'title', 'duration', 'order_index', 'content', 'metadata'],
         },
       ],
       order: [
@@ -50,15 +51,7 @@ export class SectionRepository extends BaseRepository<Section> {
         {
           model: Lesson,
           as: 'lessons',
-          attributes: [
-            'id',
-            'title',
-            'description',
-            'duration',
-            'order_index',
-            'video_url',
-            'is_preview',
-          ],
+          attributes: ['id', 'title', 'duration', 'order_index', 'content', 'metadata'],
           order: [['order_index', 'ASC']],
         },
       ],
@@ -79,8 +72,8 @@ export class SectionRepository extends BaseRepository<Section> {
     let whereClause: any = {};
     if (search) {
       whereClause[Op.or] = [
-        { title: { [Op.iLike]: `%${search}%` } },
-        { description: { [Op.iLike]: `%${search}%` } },
+        { title: { [Op.like]: `%${search}%` } },
+        { description: { [Op.like]: `%${search}%` } },
       ];
     }
 
@@ -226,7 +219,7 @@ export class SectionRepository extends BaseRepository<Section> {
           attributes: ['instructor_id'],
           include: [
             {
-              model: 'Enrollment' as any,
+              model: Enrollment,
               as: 'enrollments',
               where: { user_id },
               required: false,

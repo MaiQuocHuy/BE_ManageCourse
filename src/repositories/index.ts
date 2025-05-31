@@ -19,6 +19,7 @@ import lessonRepository from './lesson.repository';
 import categoryRepository from './category.repository';
 import paymentRepository from './payment.repository';
 import lessonCompletionRepository from './lesson-completion.repository';
+import courseCategoryRepository from './course-category.repository';
 
 export {
   reviewRepository,
@@ -30,4 +31,5 @@ export {
   categoryRepository,
   paymentRepository,
   lessonCompletionRepository,
+  courseCategoryRepository,
 };

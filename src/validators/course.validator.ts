@@ -14,11 +14,12 @@ export const createCourseSchema = Joi.object({
 // Update course validation schema
 export const updateCourseSchema = Joi.object({
   body: Joi.object({
-    title: Joi.string().min(5).max(255),
-    description: Joi.string().allow("", null),
-    price: Joi.number().min(0),
-    is_published: Joi.boolean(),
-    categories: Joi.string().allow("", null),
+    title: Joi.string().min(5).max(255).allow('', null),
+    description: Joi.string().allow('', null),
+    price: Joi.number().min(0).allow('', null),
+    is_published: Joi.boolean().allow('', null),
+    categoryIds: Joi.string().allow('', null),
+    thumbnail: Joi.any().optional(),
   }).required(),
   params: Joi.object({
     id: Joi.string().required(),
@@ -73,6 +74,7 @@ export const searchCoursesSchema = Joi.object({
     limit: Joi.number().integer().min(1).max(100),
     category_id: Joi.string(),
     is_published: Joi.boolean(),
+    is_approved: Joi.boolean(),
   }).required(),
 });
 

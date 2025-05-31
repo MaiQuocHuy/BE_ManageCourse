@@ -83,30 +83,21 @@ class CourseController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const id = req.params.id;
-      const { title, description, price, is_published, categories } = req.body;
-      const currentUserId = req.user!.id;
-      const thumbnail = req.file;
-
-      const course = await courseService.updateCourse(
-        id,
+      const courseId = req.params.id;
+      const userId = req.user?.id || '';
+      const updatedCourse = await courseService.updateCourse(
+        courseId,
         {
-          title,
-          description,
-          price: price ? parseFloat(price) : undefined,
-          thumbnail,
-          is_published:
-            is_published !== undefined
-              ? is_published === "true" || is_published === true
-              : undefined,
-          categories: categories ? categories.split(",") : undefined,
+          ...req.body,
+          thumbnail: req.file,
         },
-        currentUserId
+        userId
       );
 
-      res.status(200).json({
+      res.json({
         success: true,
-        data: course,
+        message: 'Course updated successfully',
+        data: updatedCourse,
       });
     } catch (error) {
       next(error);
@@ -201,10 +192,11 @@ class CourseController {
     try {
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
-
+      const status = req.query.status as string;
       const result = await courseService.getAllCoursesForModeration({
         page,
         limit,
+        status,
       });
 
       res.status(200).json({
@@ -255,17 +247,18 @@ class CourseController {
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
       const category_id = req.query.category_id as string | undefined;
-      const category = category_id;
       const is_published = req.query.is_published === 'false' ? false : true;
       const is_approved = req.query.is_approved === 'true' ? true : false;
 
       const result = await courseService.getCourses({
         page,
         limit,
-        category,
+        category_id,
         is_published,
         is_approved,
       });
+
+      console.log(result.total);
 
       res.status(200).json({
         success: true,
@@ -335,9 +328,8 @@ class CourseController {
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
       const category_id = req.query.category_id as string | undefined;
-      const category = category_id;
       const is_published = req.query.is_published === 'false' ? false : true;
-
+      const is_approved = req.query.is_approved === 'false' ? false : true;
       if (!keyword) {
         return next(new Error('Keyword is required for search'));
       }
@@ -346,8 +338,9 @@ class CourseController {
         keyword,
         page,
         limit,
-        category,
+        category_id,
         is_published,
+        is_approved,
       });
 
       res.status(200).json({

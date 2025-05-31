@@ -34,23 +34,24 @@ interface CourseCreateData {
 interface CourseUpdateData {
   title?: string;
   description?: string;
-  price?: number;
+  price?: number | string;
   thumbnail?: Express.Multer.File;
-  is_published?: boolean;
+  is_published?: boolean | string;
   is_approved?: boolean;
-  categories?: string[];
+  categories?: string[] | string;
 }
 
 interface PaginationOptions {
   page?: number;
   limit?: number;
-  category?: string;
+  category_id?: string;
   is_published?: boolean;
   is_approved?: boolean;
   instructor_id?: string;
   price_min?: number;
   price_max?: number;
   level?: string;
+  status?: string;
 }
 
 interface SearchOptions extends PaginationOptions {
@@ -238,6 +239,7 @@ class CourseService {
     }
 
     const { title, description, price, thumbnail, is_published, categories } = data;
+    console.log('data in service:', data);
 
     let transaction: Transaction | null = null;
 
@@ -261,31 +263,57 @@ class CourseService {
         thumbnailPublicId = uploadResult.public_id;
       }
 
-      // Update the course using repository
-      await courseRepository.update(
-        {
-          title: title !== undefined ? title : course.title,
-          description: description !== undefined ? description : course.description,
-          price: price !== undefined ? price : course.price,
-          thumbnail: thumbnailUrl,
-          thumbnail_public_id: thumbnailPublicId,
-          is_published: is_published !== undefined ? is_published : course.is_published,
-        },
-        { id },
-        { transaction }
-      );
+      // Prepare update data
+      const updateData: any = {
+        thumbnail: thumbnailUrl,
+        thumbnail_public_id: thumbnailPublicId,
+      };
+
+      // Only update fields that have values
+      if (title !== undefined && title !== '') {
+        updateData.title = title;
+      }
+
+      if (description !== undefined && description !== '') {
+        updateData.description = description;
+      }
+
+      if (price !== undefined && price !== '') {
+        // Chuyển đổi giá trị price thành số nếu là string
+        // checking if price is not equal to 0 => update price
+        if (price !== '0') updateData.price = typeof price === 'string' ? parseFloat(price) : price;
+      }
+
+      if (is_published !== undefined) {
+        // Chuyển đổi giá trị is_published thành boolean nếu là string
+        updateData.is_published =
+          typeof is_published === 'string' ? is_published === 'true' : Boolean(is_published);
+      }
+
+      console.log('UpdateData for DB:', updateData);
+
+      // Update the course
+      await courseRepository.update(updateData, { id }, { transaction });
 
       // Update categories if provided
       if (categories) {
-        // Remove existing associations
-        await CourseCategory.destroy({
-          where: { course_id: id },
-          transaction,
-        });
+        // Chuyển đổi categories từ string thành mảng nếu cần
+        const categoryArray =
+          typeof categories === 'string'
+            ? categories.split(',').filter(Boolean)
+            : Array.isArray(categories)
+              ? categories
+              : [];
 
-        // Create new associations
-        if (categories.length > 0) {
-          const categoryAssociations = categories.map(category_id => ({
+        if (categoryArray.length > 0) {
+          // Remove existing associations
+          await CourseCategory.destroy({
+            where: { course_id: id },
+            transaction,
+          });
+
+          // Create new associations
+          const categoryAssociations = categoryArray.map((category_id: string) => ({
             course_id: id,
             category_id,
           }));
@@ -402,12 +430,12 @@ class CourseService {
   async getAllCoursesForModeration(
     options: PaginationOptions = {}
   ): Promise<{ courses: Course[]; total: number }> {
-    const { page = 1, limit = 10 } = options;
+    const { page = 1, limit = 10, status } = options;
 
     return await courseRepository.findByInstructorId('', {
       page,
       limit,
-      status: 'pending', // This maps to is_approved = false
+      status: status || 'pending', // This maps to is_approved = false
     });
   }
 
@@ -430,14 +458,14 @@ class CourseService {
    * Get all courses with pagination and filtering
    */
   async getCourses(options: PaginationOptions = {}): Promise<{ courses: Course[]; total: number }> {
-    const { page = 1, limit = 10, category, is_published = true, is_approved = true } = options;
+    const { page = 1, limit = 10, category_id, is_published = true, is_approved = true } = options;
 
     if (is_published && is_approved) {
       // Get published and approved courses using repository
       return await courseRepository.findPublishedCourses({
         page,
         limit,
-        category,
+        category_id,
         price_min: options.price_min,
         price_max: options.price_max,
         level: options.level,
@@ -480,7 +508,7 @@ class CourseService {
       keyword,
       page = 1,
       limit = 10,
-      category,
+      category_id,
       price_min,
       price_max,
       level,
@@ -490,7 +518,7 @@ class CourseService {
     return await courseRepository.searchCourses(
       keyword,
       {
-        categories: category ? [category] : undefined,
+        categories: category_id ? [category_id] : undefined,
         price_range: {
           min: price_min,
           max: price_max,

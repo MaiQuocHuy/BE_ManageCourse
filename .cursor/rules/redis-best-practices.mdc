@@ -1,0 +1,404 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Redis Best Practices
+
+Tuân thủ các quy tắc này để sử dụng Redis một cách hiệu quả và tránh các lỗi phổ biến.
+
+## Connection Management & Pool
+
+### 1. Connection Pooling
+```typescript
+// ✅ DO: Sử dụng connection pool
+const redis = new Redis({
+  host: process.env.REDIS_HOST,
+  port: parseInt(process.env.REDIS_PORT || '6379'),
+  password: process.env.REDIS_PASSWORD,
+  maxRetriesPerRequest: 3,
+  retryDelayOnFailover: 100,
+  lazyConnect: true,
+  maxmemoryPolicy: 'allkeys-lru',
+  // Connection pool settings
+  family: 4,
+  keepAlive: true,
+  connectTimeout: 10000,
+  commandTimeout: 5000,
+});
+
+// ❌ DON'T: Tạo connection mới cho mỗi operation
+const redis = new Redis(); // Mỗi lần gọi
+```
+
+### 2. Connection Error Handling
+```typescript
+// ✅ DO: Handle connection errors properly
+redis.on('error', (err) => {
+  console.error('Redis connection error:', err);
+  // Implement reconnection logic
+});
+
+redis.on('ready', () => {
+  console.log('Redis connected successfully');
+});
+
+redis.on('reconnecting', () => {
+  console.log('Redis reconnecting...');
+});
+```
+
+## Key Naming Conventions
+
+### 3. Structured Key Names
+```typescript
+// ✅ DO: Sử dụng naming convention rõ ràng
+const USER_SESSION_KEY = (userId: string) => `session:user:${userId}`;
+const CACHE_KEY = (type: string, id: string) => `cache:${type}:${id}`;
+const RATE_LIMIT_KEY = (ip: string) => `rate_limit:${ip}:${Date.now()}`;
+
+// ❌ DON'T: Key names không rõ ràng
+const key = `user123session`; // Không có structure
+const key2 = `cache-user-data-123`; // Inconsistent format
+```
+
+### 4. Key Expiration Strategy
+```typescript
+// ✅ DO: Luôn set TTL cho keys tạm thời
+await redis.setex(`temp:${userId}`, 3600, data); // 1 hour
+await redis.expire(`cache:${key}`, 1800); // 30 minutes
+
+// ✅ DO: Sử dụng TTL phù hợp với use case
+const TTL = {
+  SESSION: 24 * 60 * 60, // 1 day
+  CACHE: 30 * 60, // 30 minutes
+  RATE_LIMIT: 60, // 1 minute
+  OTP: 5 * 60, // 5 minutes
+} as const;
+
+// ❌ DON'T: Không set TTL cho temporary data
+await redis.set(`temp:${key}`, data); // Memory leak risk
+```
+
+## Data Serialization & Types
+
+### 5. Proper Data Handling
+```typescript
+// ✅ DO: Serialize complex objects properly
+class RedisService {
+  async setObject<T>(key: string, value: T, ttl?: number): Promise<void> {
+    const serialized = JSON.stringify(value);
+    if (ttl) {
+      await redis.setex(key, ttl, serialized);
+    } else {
+      await redis.set(key, serialized);
+    }
+  }
+
+  async getObject<T>(key: string): Promise<T | null> {
+    const data = await redis.get(key);
+    return data ? JSON.parse(data) : null;
+  }
+}
+
+// ❌ DON'T: Store objects directly
+await redis.set(key, { user: 'data' }); // Will store [object Object]
+```
+
+### 6. Type Safety
+```typescript
+// ✅ DO: Use typed Redis operations
+interface UserSession {
+  userId: string;
+  email: string;
+  loginAt: Date;
+}
+
+const session = await redisService.getObject<UserSession>(sessionKey);
+if (session?.userId) {
+  // Type-safe access
+}
+```
+
+## Performance Optimization
+
+### 7. Batch Operations
+```typescript
+// ✅ DO: Use pipelines for multiple operations
+const pipeline = redis.pipeline();
+pipeline.set('key1', 'value1');
+pipeline.set('key2', 'value2');
+pipeline.expire('key1', 3600);
+await pipeline.exec();
+
+// ✅ DO: Use MGET/MSET for multiple keys
+const values = await redis.mget(['key1', 'key2', 'key3']);
+await redis.mset('key1', 'val1', 'key2', 'val2');
+
+// ❌ DON'T: Multiple individual operations
+await redis.set('key1', 'value1');
+await redis.set('key2', 'value2'); // Multiple round trips
+```
+
+### 8. Memory Efficient Operations
+```typescript
+// ✅ DO: Use appropriate data structures
+// For large datasets, use SCAN instead of KEYS
+const keys: string[] = [];
+const stream = redis.scanStream({
+  match: 'cache:*',
+  count: 100
+});
+
+stream.on('data', (resultKeys) => {
+  keys.push(...resultKeys);
+});
+
+// ✅ DO: Use HGETALL for related data
+await redis.hset('user:123', {
+  name: 'John',
+  email: 'john@example.com',
+  lastLogin: Date.now()
+});
+
+// ❌ DON'T: Use KEYS * in production
+const allKeys = await redis.keys('*'); // Blocks server
+```
+
+## Error Handling & Resilience
+
+### 9. Graceful Degradation
+```typescript
+// ✅ DO: Handle Redis failures gracefully
+class CacheService {
+  async get<T>(key: string): Promise<T | null> {
+    try {
+      const data = await redis.get(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Redis GET error:', error);
+      return null; // Fallback to database
+    }
+  }
+
+  async set(key: string, value: any, ttl?: number): Promise<boolean> {
+    try {
+      if (ttl) {
+        await redis.setex(key, ttl, JSON.stringify(value));
+      } else {
+        await redis.set(key, JSON.stringify(value));
+      }
+      return true;
+    } catch (error) {
+      console.error('Redis SET error:', error);
+      return false; // Continue without caching
+    }
+  }
+}
+```
+
+### 10. Circuit Breaker Pattern
+```typescript
+// ✅ DO: Implement circuit breaker for Redis operations
+class RedisCircuitBreaker {
+  private failures = 0;
+  private readonly threshold = 5;
+  private readonly timeout = 30000; // 30s
+  private lastFailTime = 0;
+
+  async execute<T>(operation: () => Promise<T>): Promise<T | null> {
+    if (this.isCircuitOpen()) {
+      return null; // Fast fail
+    }
+
+    try {
+      const result = await operation();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+
+  private isCircuitOpen(): boolean {
+    return this.failures >= this.threshold && 
+           Date.now() - this.lastFailTime < this.timeout;
+  }
+}
+```
+
+## Security Best Practices
+
+### 11. Security Configuration
+```typescript
+// ✅ DO: Secure Redis configuration
+const redis = new Redis({
+  host: process.env.REDIS_HOST,
+  port: parseInt(process.env.REDIS_PORT || '6379'),
+  password: process.env.REDIS_PASSWORD,
+  tls: process.env.NODE_ENV === 'production' ? {} : undefined,
+  // Disable dangerous commands
+  enableReadyCheck: true,
+  maxRetriesPerRequest: 3,
+});
+
+// ✅ DO: Validate input before Redis operations
+const sanitizeKey = (key: string): string => {
+  return key.replace(/[^a-zA-Z0-9:_-]/g, '');
+};
+```
+
+## Rate Limiting & Atomic Operations
+
+### 12. Atomic Rate Limiting
+```typescript
+// ✅ DO: Use Lua scripts for atomic operations
+const rateLimitScript = `
+  local key = KEYS[1]
+  local window = tonumber(ARGV[1])
+  local limit = tonumber(ARGV[2])
+  
+  local current = redis.call('GET', key)
+  if current == false then
+    redis.call('SET', key, 1)
+    redis.call('EXPIRE', key, window)
+    return 1
+  end
+  
+  current = tonumber(current)
+  if current < limit then
+    redis.call('INCR', key)
+    return current + 1
+  else
+    return -1
+  end
+`;
+
+class RateLimiter {
+  async checkRateLimit(key: string, window: number, limit: number): Promise<boolean> {
+    const result = await redis.eval(rateLimitScript, 1, key, window, limit) as number;
+    return result !== -1;
+  }
+}
+```
+
+## Monitoring & Debugging
+
+### 13. Redis Monitoring
+```typescript
+// ✅ DO: Monitor Redis performance
+class RedisMonitor {
+  async getRedisInfo(): Promise<any> {
+    const info = await redis.info();
+    const memory = await redis.info('memory');
+    const stats = await redis.info('stats');
+    
+    return {
+      info: this.parseRedisInfo(info),
+      memory: this.parseRedisInfo(memory),
+      stats: this.parseRedisInfo(stats),
+    };
+  }
+
+  async monitorSlowQueries(): Promise<any[]> {
+    return await redis.slowlog('get', 10);
+  }
+}
+
+// ✅ DO: Log Redis operations in development
+if (process.env.NODE_ENV === 'development') {
+  redis.on('connect', () => console.log('Redis connected'));
+  redis.monitor((time, args, source, database) => {
+    console.log(`${time}: ${args.join(' ')}`);
+  });
+}
+```
+
+## Cleanup & Maintenance
+
+### 14. Memory Management
+```typescript
+// ✅ DO: Implement cleanup strategies
+class RedisCleanup {
+  async cleanupExpiredSessions(): Promise<void> {
+    const stream = redis.scanStream({
+      match: 'session:*',
+      count: 100
+    });
+
+    stream.on('data', async (keys) => {
+      const pipeline = redis.pipeline();
+      
+      for (const key of keys) {
+        const ttl = await redis.ttl(key);
+        if (ttl === -1) { // No TTL set
+          pipeline.expire(key, 86400); // Set 24h TTL
+        }
+      }
+      
+      await pipeline.exec();
+    });
+  }
+
+  async cleanupLargeKeys(): Promise<void> {
+    // Monitor and cleanup keys > 1MB
+    const info = await redis.memory('usage', 'large-key-pattern:*');
+    // Implement cleanup logic
+  }
+}
+```
+
+## Tránh Các Lỗi Phổ Biến
+
+### 15. Common Pitfalls
+```typescript
+// ❌ DON'T: Blocking operations in production
+await redis.keys('*'); // Use SCAN instead
+await redis.flushall(); // Dangerous in production
+
+// ❌ DON'T: Storing large objects without consideration
+await redis.set('large-data', JSON.stringify(largeObject)); // Check size first
+
+// ❌ DON'T: Not handling connection failures
+await redis.get(key); // Should be wrapped in try-catch
+
+// ❌ DON'T: Using synchronous operations
+redis.getSync(key); // Use async operations
+
+// ❌ DON'T: Not setting memory limits
+// Configure maxmemory and maxmemory-policy in Redis config
+```
+
+## Environment Configuration
+
+### 16. Environment-Specific Settings
+```typescript
+// ✅ DO: Different configs for different environments
+const getRedisConfig = () => {
+  const baseConfig = {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379'),
+    password: process.env.REDIS_PASSWORD,
+  };
+
+  if (process.env.NODE_ENV === 'production') {
+    return {
+      ...baseConfig,
+      tls: {},
+      maxRetriesPerRequest: 3,
+      retryDelayOnFailover: 100,
+      connectTimeout: 60000,
+      lazyConnect: true,
+    };
+  }
+
+  return {
+    ...baseConfig,
+    retryDelayOnFailover: 50,
+    maxRetriesPerRequest: 1,
+  };
+};
+```
+
+Tuân thủ các rules này sẽ giúp hệ thống Redis hoạt động ổn định, hiệu quả và tránh được các lỗi phổ biến trong production.

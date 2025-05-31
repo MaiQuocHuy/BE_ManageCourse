@@ -5,6 +5,8 @@ import { Role } from '../models/user-role.model';
 import { PaymentStatus } from '../models/payment.model';
 import paymentService from '../services/payment.service';
 import courseService from '../services/course.service';
+import { toVNDateRange } from '../utils/date';
+import enrollmentService from '../services/enrollment.service';
 
 class PaymentController {
   // Create a new payment
@@ -23,8 +25,12 @@ class PaymentController {
         throw new ApiError(400, 'Course is not available for purchase');
       }
 
-      // If amount is not provided, use course price
-      const paymentAmount = amount || course.price;
+      // Check amount is not less than course price
+      if (amount < course.price) {
+        throw new ApiError(400, 'Amount is less than course price');
+      }
+
+      const paymentAmount = amount;
 
       const payment = await paymentService.createPayment(
         user_id,
@@ -77,21 +83,28 @@ class PaymentController {
   async getUserPayments(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { page, limit, status } = req.query;
-      const user_id = req.params.userId || req.user?.id;
+      const current_user_id = req.user?.id;
 
-      if (!user_id) {
+      if (!current_user_id) {
         throw new ApiError(401, 'Not authenticated');
       }
 
-      // Check if user has permission to view payments
-      if (req.params.userId && req.params.userId !== req.user?.id) {
+      // Determine which user's payments to fetch
+      let target_user_id: string;
+
+      if (req.params.userId) {
+        // Admin viewing specific user's payments
         const roles = req.user?.roles || [];
         if (!roles.includes(Role.ADMIN)) {
-          throw new ApiError(403, "You don't have permission to view other users' payments");
+          throw new ApiError(403, "Only admin can view other users' payments");
         }
+        target_user_id = req.params.userId;
+      } else {
+        // Current user viewing their own payments
+        target_user_id = current_user_id;
       }
 
-      const payments = await paymentService.getUserPayments(user_id as string, {
+      const payments = await paymentService.getUserPayments(target_user_id, {
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
         status: status as string,
@@ -155,14 +168,13 @@ class PaymentController {
     try {
       const { id } = req.params;
       const { status } = req.body;
-      const roles = req.user?.roles || [];
-
-      // Only admin can update payment status
-      if (!roles.includes(Role.ADMIN)) {
-        throw new ApiError(403, 'Only admin can update payment status');
-      }
 
       const payment = await paymentService.updatePaymentStatus(id, status);
+
+      //Check if payments' status is completed => auto create enrollment
+      if (payment.status === PaymentStatus.COMPLETED) {
+        await enrollmentService.createEnrollment(payment.user_id, payment.course_id);
+      }
 
       res.status(200).json({
         success: true,
@@ -179,21 +191,6 @@ class PaymentController {
     try {
       const { id } = req.params;
       const { reason, amount } = req.body;
-      const user_id = req.user?.id;
-      const roles = req.user?.roles || [];
-
-      if (!user_id) {
-        throw new ApiError(401, 'Not authenticated');
-      }
-
-      // Get the payment to check if user owns it
-      const payment = await paymentService.getPaymentById(id);
-
-      // Check if user has permission to refund
-      const isAdmin = roles.includes(Role.ADMIN);
-      if (!isAdmin && payment.user_id !== user_id) {
-        throw new ApiError(403, "You don't have permission to request a refund for this payment");
-      }
 
       const refund = await paymentService.processRefund(id, reason, amount);
 
@@ -245,9 +242,28 @@ class PaymentController {
         throw new ApiError(400, 'Start date and end date are required');
       }
 
+      let startDate = start_date ? new Date(start_date as string) : undefined;
+      let endDate = end_date ? new Date(end_date as string) : undefined;
+
+      if (!startDate && !endDate) {
+        throw new ApiError(400, 'Start date and end date are required');
+      }
+
+      if (startDate && endDate) {
+        startDate = toVNDateRange(start_date as string);
+        endDate = toVNDateRange(end_date as string, true);
+      } else if (!startDate) {
+        // If no start date, default to 30 days before end date
+        startDate = new Date(endDate!.getTime());
+        startDate.setDate(startDate.getDate() - 30);
+      } else if (!endDate) {
+        // If no end date, default to current date
+        endDate = new Date();
+      }
+
       const revenueByTime = await paymentService.getRevenueByTime(
-        new Date(start_date as string),
-        new Date(end_date as string),
+        startDate!,
+        endDate!,
         period as 'day' | 'week' | 'month' | 'year' | undefined
       );
 
@@ -265,22 +281,54 @@ class PaymentController {
   // Get revenue statistics
   async getRevenueStatistics(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { start_date, end_date } = req.query;
+      const { start_date, end_date, instructor_id } = req.query;
+      const user_id = req.user?.id;
       const roles = req.user?.roles || [];
 
-      // Only admin can view revenue statistics
-      if (!roles.includes(Role.ADMIN)) {
-        throw new ApiError(403, 'Only admin can view revenue statistics');
+      if (!user_id) {
+        throw new ApiError(401, 'Not authenticated');
       }
 
-      const startDate = start_date ? new Date(start_date as string) : undefined;
-      const endDate = end_date ? new Date(end_date as string) : undefined;
+      // Check permissions
+      const isAdmin = roles.includes(Role.ADMIN);
+      const isInstructor = roles.includes(Role.INSTRUCTOR);
 
-      const statistics = await paymentService.getRevenueStatistics(startDate, endDate);
+      if (!isAdmin && !isInstructor) {
+        throw new ApiError(403, 'Only admin and instructor can view revenue statistics');
+      }
+
+      let targetInstructorId: string | undefined;
+
+      // Determine which instructor's statistics to show
+      if (isAdmin) {
+        // Admin can view statistics for any instructor or overall statistics
+        targetInstructorId = instructor_id as string;
+      } else if (isInstructor) {
+        // Instructor can only view their own statistics
+        if (instructor_id && instructor_id !== user_id) {
+          throw new ApiError(403, 'Instructor can only view their own revenue statistics');
+        }
+        targetInstructorId = user_id;
+      }
+
+      let startDate = start_date ? new Date(start_date as string) : undefined;
+      let endDate = end_date ? new Date(end_date as string) : undefined;
+
+      if (startDate && endDate) {
+        startDate = toVNDateRange(start_date as string);
+        endDate = toVNDateRange(end_date as string, true);
+      }
+
+      const statistics = await paymentService.getRevenueStatistics(
+        startDate,
+        endDate,
+        targetInstructorId
+      );
 
       res.status(200).json({
         success: true,
         data: {
+          instructor_id: targetInstructorId,
           statistics,
         },
       });
@@ -309,10 +357,19 @@ class PaymentController {
         throw new ApiError(403, "You don't have permission to view this instructor's revenue");
       }
 
-      const startDate = start_date ? new Date(start_date as string) : undefined;
-      const endDate = end_date ? new Date(end_date as string) : undefined;
+      let startDate = start_date ? new Date(start_date as string) : undefined;
+      let endDate = end_date ? new Date(end_date as string) : undefined;
 
-      const revenue = await paymentService.getInstructorRevenue(instructorId, startDate, endDate);
+      if (!startDate && !endDate) {
+        throw new ApiError(400, 'Start date and end date are required');
+      }
+
+      if (startDate && endDate) {
+        startDate = toVNDateRange(start_date as string);
+        endDate = toVNDateRange(end_date as string, true);
+      }
+
+      const revenue = await paymentService.getInstructorRevenue(instructorId, startDate!, endDate!);
 
       res.status(200).json({
         success: true,
@@ -331,14 +388,23 @@ class PaymentController {
     try {
       const { page, limit, start_date, end_date } = req.query;
 
-      const startDate = start_date ? new Date(start_date as string) : undefined;
-      const endDate = end_date ? new Date(end_date as string) : undefined;
+      let startDate = start_date ? new Date(start_date as string) : undefined;
+      let endDate = end_date ? new Date(end_date as string) : undefined;
+
+      if (!startDate && !endDate) {
+        throw new ApiError(400, 'Start date and end date are required');
+      }
+
+      if (startDate && endDate) {
+        startDate = toVNDateRange(start_date as string);
+        endDate = toVNDateRange(end_date as string, true);
+      }
 
       const courses = await paymentService.getHighestRevenueCourses({
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
-        start_date: startDate,
-        end_date: endDate,
+        start_date: startDate!,
+        end_date: endDate!,
       });
 
       res.status(200).json({

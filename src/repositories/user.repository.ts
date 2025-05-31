@@ -39,8 +39,8 @@ export class UserRepository extends BaseRepository<User> {
 
     if (search) {
       whereClause[Op.or] = [
-        { name: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } },
+        { name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
       ];
     }
 
@@ -86,8 +86,8 @@ export class UserRepository extends BaseRepository<User> {
 
     if (search) {
       whereClause[Op.or] = [
-        { name: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } },
+        { name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
       ];
     }
 

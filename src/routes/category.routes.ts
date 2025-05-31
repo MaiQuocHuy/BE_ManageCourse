@@ -11,9 +11,11 @@ import {
   getCategoryBySlugSchema,
   courseCategorySchema,
   disassociateCourseSchema,
+  disassociateCourseFromCategoriesSchema,
+  updateCourseCategoriesSchema,
   getCoursesForCategorySchema,
   getHierarchySchema,
-} from "../validators/category.validator";
+} from '../validators/category.validator';
 
 const router = express.Router();
 
@@ -63,7 +65,7 @@ const router = express.Router();
  *         description: Server error
  */
 router.post(
-  "/",
+  '/',
   authenticate,
   authorize([Role.ADMIN]),
   validateRequest(createCategorySchema),
@@ -98,14 +100,14 @@ router.post(
  *         required: true
  *         schema:
  *           type: boolean
- *         description: Inactive category
+ *         description: Active category
  *     responses:
  *       200:
  *         description: List of categories
  *       500:
  *         description: Server error
  */
-router.get("/", categoryController.getAllCategories);
+router.get('/', categoryController.getAllCategories);
 
 // Get category hierarchy
 /**
@@ -120,7 +122,7 @@ router.get("/", categoryController.getAllCategories);
  *         required: true
  *         schema:
  *           type: boolean
- *         description: Inactive category
+ *         description: Active category
  *     responses:
  *       200:
  *         description: Category hierarchy
@@ -128,7 +130,7 @@ router.get("/", categoryController.getAllCategories);
  *         description: Server error
  */
 router.get(
-  "/hierarchy",
+  '/hierarchy',
   validateRequest(getHierarchySchema),
   categoryController.getCategoryHierarchy
 );
@@ -151,7 +153,7 @@ router.get(
  *         description: Server error
  */
 router.post(
-  "/default",
+  '/default',
   authenticate,
   authorize([Role.ADMIN]),
   categoryController.addDefaultCategories
@@ -170,7 +172,7 @@ router.post(
  *       500:
  *         description: Server error
  */
-router.get("/counts", categoryController.getCategoryCounts);
+router.get('/counts', categoryController.getCategoryCounts);
 
 // Get category by slug
 /**
@@ -195,7 +197,7 @@ router.get("/counts", categoryController.getCategoryCounts);
  *         description: Server error
  */
 router.get(
-  "/slug/:slug",
+  '/slug/:slug',
   validateRequest(getCategoryBySlugSchema),
   categoryController.getCategoryBySlug
 );
@@ -222,14 +224,14 @@ router.get(
  *       500:
  *         description: Server error
  */
-router.get("/course/:courseId", categoryController.getCategoriesForCourse);
+router.get('/course/:courseId', categoryController.getCategoriesForCourse);
 
-// Associate a course with a category
+// Associate a course with multiple categories
 /**
  * @swagger
  * /api/categories/course/{courseId}:
  *   post:
- *     summary: Associate a course with a category
+ *     summary: Associate a course with multiple categories
  *     tags: [Categories]
  *     security:
  *       - bearerAuth: []
@@ -238,7 +240,7 @@ router.get("/course/:courseId", categoryController.getCategoriesForCourse);
  *         name: courseId
  *         required: true
  *         schema:
- *           type: integer
+ *           type: string
  *         description: Course ID
  *     requestBody:
  *       required: true
@@ -247,34 +249,40 @@ router.get("/course/:courseId", categoryController.getCategoriesForCourse);
  *           schema:
  *             type: object
  *             required:
- *               - category_id
+ *               - category_ids
  *             properties:
- *               category_id:
- *                 type: integer
+ *               category_ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["category1", "category2"]
+ *                 description: Array of category IDs to associate with the course
  *     responses:
  *       200:
- *         description: Course associated with category successfully
+ *         description: Course associated with categories successfully
+ *       400:
+ *         description: Invalid input
  *       403:
  *         description: Not authorized
  *       404:
- *         description: Category or course not found
+ *         description: Course or category not found
  *       500:
  *         description: Server error
  */
 router.post(
-  "/course/:courseId",
+  '/course/:courseId',
   authenticate,
   authorize([Role.ADMIN, Role.INSTRUCTOR]),
   validateRequest(courseCategorySchema),
   categoryController.associateCourseWithCategory
 );
 
-// Disassociate a course from a category
+// Update course categories (replace all existing associations)
 /**
  * @swagger
- * /api/categories/course/{courseId}:
- *   delete:
- *     summary: Disassociate a course from a category
+ * /api/categories/course/{courseId}/categories:
+ *   put:
+ *     summary: Update course categories (replace all existing associations)
  *     tags: [Categories]
  *     security:
  *       - bearerAuth: []
@@ -283,7 +291,7 @@ router.post(
  *         name: courseId
  *         required: true
  *         schema:
- *           type: integer
+ *           type: string
  *         description: Course ID
  *     requestBody:
  *       required: true
@@ -292,13 +300,70 @@ router.post(
  *           schema:
  *             type: object
  *             required:
- *               - category_id
+ *               - category_ids
  *             properties:
- *               category_id:
- *                 type: integer
+ *               category_ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["category1", "category2", "category3"]
+ *                 description: Array of category IDs to replace all existing associations
  *     responses:
  *       200:
- *         description: Course disassociated from category successfully
+ *         description: Course categories updated successfully
+ *       400:
+ *         description: Invalid input
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Course or category not found
+ *       500:
+ *         description: Server error
+ */
+router.put(
+  '/course/:courseId/categories',
+  authenticate,
+  authorize([Role.ADMIN, Role.INSTRUCTOR]),
+  validateRequest(updateCourseCategoriesSchema),
+  categoryController.updateCourseCategories
+);
+
+// Disassociate a course from multiple categories
+/**
+ * @swagger
+ * /api/categories/course/{courseId}/categories:
+ *   delete:
+ *     summary: Disassociate a course from multiple categories
+ *     tags: [Categories]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Course ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - category_ids
+ *             properties:
+ *               category_ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["category1", "category2"]
+ *                 description: Array of category IDs to disassociate from the course
+ *     responses:
+ *       200:
+ *         description: Course disassociated from categories successfully
+ *       400:
+ *         description: Invalid input
  *       403:
  *         description: Not authorized
  *       404:
@@ -307,17 +372,17 @@ router.post(
  *         description: Server error
  */
 router.delete(
-  "/course/:courseId",
+  '/course/:courseId/categories',
   authenticate,
   authorize([Role.ADMIN, Role.INSTRUCTOR]),
-  validateRequest(disassociateCourseSchema),
-  categoryController.disassociateCourseFromCategory
+  validateRequest(disassociateCourseFromCategoriesSchema),
+  categoryController.disassociateCourseFromCategories
 );
 
 // Get courses for a category
 /**
  * @swagger
- * /api/courses/category/{categoryId}:
+ * /api/categories/courses/category/{categoryId}:
  *   get:
  *     summary: Get courses for a category
  *     tags: [Categories]
@@ -352,7 +417,7 @@ router.delete(
  *         description: Server error
  */
 router.get(
-  "/courses/:categoryId",
+  '/courses/category/:categoryId',
   validateRequest(getCoursesForCategorySchema),
   categoryController.getCoursesForCategory
 );

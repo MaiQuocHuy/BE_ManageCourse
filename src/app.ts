@@ -9,9 +9,12 @@ import lessonRoutes from "./routes/lesson.routes";
 import enrollmentRoutes from "./routes/enrollment.routes";
 import paymentRoutes from "./routes/payment.routes";
 import reviewRoutes from "./routes/review.routes";
-import { errorHandler } from "./middleware/error.middleware";
-import swaggerJsdoc from "swagger-jsdoc";
-import swaggerUi from "swagger-ui-express";
+import cacheRoutes from './routes/cache.routes';
+import { errorHandler } from './middleware/error.middleware';
+import swaggerJsdoc from 'swagger-jsdoc';
+import swaggerUi from 'swagger-ui-express';
+import RedisClient from './config/redis';
+import categoryService from './services/category.service';
 // Import models to initialize associations
 import "./models/index";
 
@@ -95,12 +98,40 @@ app.use("/api/lessons", lessonRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use('/api/cache', cacheRoutes);
 
 // Error handling middleware must be after all routes
 app.use(errorHandler);
 
-app.listen(port, () => {
-  return console.log(`Express is listening at http://localhost:${port}/api-docs`);
+// Initialize Redis and warm up cache on startup
+async function initializeApp() {
+  try {
+    // Test Redis connection
+    console.log('🔌 Testing Redis connection...');
+    const redisConnected = await RedisClient.testConnection();
+
+    if (redisConnected) {
+      console.log('✅ Redis connected successfully');
+
+      // Warm up cache with frequently accessed data
+      console.log('🔥 Warming up cache...');
+      await categoryService.warmUpCache();
+    } else {
+      console.warn('⚠️ Redis not available - application will run without caching');
+    }
+  } catch (error) {
+    console.error('❌ Error during app initialization:', error);
+    console.warn('⚠️ Continuing without Redis caching...');
+  }
+}
+
+app.listen(port, async () => {
+  console.log(`🚀 Express is listening at http://localhost:${port}/api-docs`);
+
+  // Initialize Redis and cache after server starts
+  await initializeApp();
+
+  console.log('✅ Application fully initialized');
 });
 
 export default app;

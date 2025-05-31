@@ -49,11 +49,11 @@ export abstract class BaseRepository<T extends Model> implements IBaseRepository
   }
 
   async findAll(options?: FindOptions): Promise<T[]> {
-    return await this.model.findAll(options || {});
+    return await this.model.findAll(options);
   }
 
   async findAndCountAll(options?: FindOptions): Promise<{ rows: T[]; count: number }> {
-    return await this.model.findAndCountAll(options || {});
+    return await this.model.findAndCountAll(options);
   }
 
   async create(data: CreationAttributes<T>, options?: CreateOptions): Promise<T> {
@@ -98,7 +98,7 @@ export abstract class BaseRepository<T extends Model> implements IBaseRepository
   }
 
   async count(options?: FindOptions): Promise<number> {
-    return await this.model.count(options || {});
+    return await this.model.count(options);
   }
 
   async exists(where: WhereOptions<T>): Promise<boolean> {

@@ -75,12 +75,8 @@ class SectionController {
   async getCourseSections(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const course_id = req.params.courseId;
-      const user_id = req.user!.id;
-      const isAdmin = req.user!.roles.some((role: any) => role.role === Role.ADMIN);
 
       // TODO: Check if user has access to this course
-      // This would be implemented when enrollment functionality is added
-
       const sections = await sectionService.getCourseSections(course_id);
 
       res.status(200).json({

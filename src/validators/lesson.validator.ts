@@ -9,7 +9,6 @@ export const createLessonSchema = Joi.object({
     type: Joi.string()
       .valid(...Object.values(LessonType))
       .default(LessonType.VIDEO),
-    is_free: Joi.boolean().default(false),
   }).required(),
 });
 
@@ -35,7 +34,6 @@ export const updateLessonSchema = Joi.object({
   body: Joi.object({
     title: Joi.string().min(3).max(255),
     type: Joi.string().valid(...Object.values(LessonType)),
-    is_free: Joi.boolean(),
   })
     .required()
     .min(1), // At least one field must be provided

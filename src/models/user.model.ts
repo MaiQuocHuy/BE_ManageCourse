@@ -12,6 +12,7 @@ interface UserAttributes {
   bio?: string;
   profile_thumbnail?: string;
   is_active: boolean;
+  token_version: number;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -20,14 +21,11 @@ interface UserAttributes {
 interface UserCreationAttributes
   extends Optional<
     UserAttributes,
-    "id" | "created_at" | "updated_at" | "is_active"
+    'id' | 'created_at' | 'updated_at' | 'is_active' | 'token_version'
   > {}
 
 // User model class
-class User
-  extends Model<UserAttributes, UserCreationAttributes>
-  implements UserAttributes
-{
+class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
   public id!: string;
   public name!: string;
   public email!: string;
@@ -35,12 +33,19 @@ class User
   public bio!: string | undefined;
   public profile_thumbnail!: string | undefined;
   public is_active!: boolean;
+  public token_version!: number;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 
   // Method to verify password
   public async verifyPassword(password: string): Promise<boolean> {
     return bcrypt.compare(password, this.password);
+  }
+
+  // Method to increment token version (invalidates all existing tokens)
+  public async incrementTokenVersion(): Promise<void> {
+    await this.increment('token_version');
+    await this.reload();
   }
 
   // Define associations
@@ -123,6 +128,11 @@ User.init(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
     },
+    token_version: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
@@ -149,6 +159,10 @@ User.init(
       {
         fields: ['name'],
         name: 'users_name_idx',
+      },
+      {
+        fields: ['token_version'],
+        name: 'users_token_version_idx',
       },
     ],
     hooks: {

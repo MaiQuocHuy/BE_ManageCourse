@@ -1,4 +1,4 @@
-import { Op, FindOptions, Transaction } from 'sequelize';
+import { Op, FindOptions, Transaction, where, fn, col, QueryTypes } from 'sequelize';
 import Course from '../models/course.model';
 import User from '../models/user.model';
 import Category from '../models/category.model';
@@ -6,12 +6,13 @@ import Section from '../models/section.model';
 import Enrollment from '../models/enrollment.model';
 import Review from '../models/review.model';
 import { BaseRepository } from './base.repository';
+import sequelize from '../config/database';
 
 interface PaginationOptions {
   page?: number;
   limit?: number;
   search?: string;
-  category?: string;
+  category_id?: string;
   instructor_id?: string;
   price_min?: number;
   price_max?: number;
@@ -61,12 +62,18 @@ export class CourseRepository extends BaseRepository<Course> {
     const { page = 1, limit = 10, search, status } = options;
     const offset = (page - 1) * limit;
 
-    let whereClause: any = { instructor_id };
+    console.log('Instructor ID', instructor_id);
+
+    let whereClause: any = {};
+
+    if (instructor_id !== '') {
+      whereClause.instructor_id = instructor_id;
+    }
 
     if (search) {
       whereClause[Op.or] = [
-        { title: { [Op.iLike]: `%${search}%` } },
-        { description: { [Op.iLike]: `%${search}%` } },
+        { 'Course.title': { [Op.like]: `%${search}%` } },
+        { 'Course.description': { [Op.like]: `%${search}%` } },
       ];
     }
 
@@ -92,10 +99,11 @@ export class CourseRepository extends BaseRepository<Course> {
           through: { attributes: [] },
         },
       ],
+      distinct: true,
       limit,
       offset,
       order: [['created_at', 'DESC']],
-    });
+    } as any);
 
     return {
       courses: rows,
@@ -115,7 +123,7 @@ export class CourseRepository extends BaseRepository<Course> {
       page = 1,
       limit = 10,
       search,
-      category,
+      category_id,
       price_min,
       price_max,
       level,
@@ -130,8 +138,8 @@ export class CourseRepository extends BaseRepository<Course> {
 
     if (search) {
       whereClause[Op.or] = [
-        { title: { [Op.iLike]: `%${search}%` } },
-        { description: { [Op.iLike]: `%${search}%` } },
+        { 'Course.title': { [Op.like]: `%${search}%` } },
+        { 'Course.description': { [Op.like]: `%${search}%` } },
       ];
     }
 
@@ -164,17 +172,20 @@ export class CourseRepository extends BaseRepository<Course> {
     ];
 
     // Filter by category if specified
-    if (category) {
-      includeOptions[1].where = { slug: category };
+    if (category_id) {
+      includeOptions[1].where = { id: category_id };
     }
 
     const { count, rows } = await this.findAndCountAll({
       where: whereClause,
       include: includeOptions,
+      distinct: true,
       limit,
       offset,
       order: [['created_at', 'DESC']],
-    });
+    } as any);
+
+    console.log('Rows', rows, 'Count', count);
 
     return {
       courses: rows,
@@ -222,10 +233,11 @@ export class CourseRepository extends BaseRepository<Course> {
         ],
       },
       group: ['Course.id', 'instructor.id'],
+      distinct: true,
       limit,
       offset,
       order: [['created_at', 'DESC']],
-    });
+    } as any);
 
     return {
       courses: rows,
@@ -311,20 +323,30 @@ export class CourseRepository extends BaseRepository<Course> {
 
     // Text search
     if (searchTerm) {
+      const loweredTerm = `%${searchTerm.toLowerCase()}%`;
+
       whereClause[Op.or] = [
-        { title: { [Op.iLike]: `%${searchTerm}%` } },
-        { description: { [Op.iLike]: `%${searchTerm}%` } },
+        where(fn('LOWER', col('Course.title')), {
+          [Op.like]: loweredTerm,
+        }),
+        where(fn('LOWER', col('Course.description')), {
+          [Op.like]: loweredTerm,
+        }),
       ];
     }
 
     // Price range filter
     if (filters.price_range) {
-      whereClause.price = {};
+      const priceFilter: any = {};
       if (filters.price_range.min !== undefined) {
-        whereClause.price[Op.gte] = filters.price_range.min;
+        priceFilter[Op.gte] = filters.price_range.min;
       }
       if (filters.price_range.max !== undefined) {
-        whereClause.price[Op.lte] = filters.price_range.max;
+        priceFilter[Op.lte] = filters.price_range.max;
+      }
+
+      if (Object.keys(priceFilter).length > 0) {
+        whereClause.price = priceFilter;
       }
     }
 
@@ -354,16 +376,17 @@ export class CourseRepository extends BaseRepository<Course> {
 
     // Category filter
     if (filters.categories && filters.categories.length > 0) {
-      includeOptions[1].where = { slug: { [Op.in]: filters.categories } };
+      includeOptions[1].where = { id: { [Op.in]: filters.categories } };
     }
 
     const { count, rows } = await this.findAndCountAll({
       where: whereClause,
       include: includeOptions,
       limit,
+      distinct: true,
       offset,
       order: [['created_at', 'DESC']],
-    });
+    } as any);
 
     return {
       courses: rows,
@@ -374,31 +397,125 @@ export class CourseRepository extends BaseRepository<Course> {
   }
 
   /**
-   * Get featured courses (highest rated or most enrolled)
+   * Get featured courses (highest rated and most reviewed)
    */
   async getFeaturedCourses(limit: number = 10): Promise<Course[]> {
-    return await this.findAll({
-      where: {
-        is_published: true,
-        is_approved: true,
-        is_featured: true,
-      },
-      include: [
-        {
-          model: User,
-          as: 'instructor',
-          attributes: ['id', 'name', 'profile_thumbnail'],
+    // Optimized SQL query for MySQL to get top rated courses
+    const featuredCoursesQuery = `
+    SELECT 
+      c.id,
+      c.title,
+      c.thumbnail,
+      c.price,
+      c.instructor_id,
+      AVG(r.rating) as avg_rating,
+      COUNT(r.id) as review_count
+    FROM 
+      courses c
+    LEFT JOIN 
+      reviews r ON c.id = r.course_id
+    WHERE 
+      c.is_published = true 
+      AND c.is_approved = true
+    GROUP BY 
+      c.id, c.title, c.thumbnail, c.price, c.instructor_id
+    HAVING 
+      COUNT(r.id) > 0
+    ORDER BY 
+      avg_rating DESC,
+      review_count DESC,
+      c.created_at DESC
+    LIMIT :limit
+    `;
+
+    try {
+      const results = await sequelize.query(featuredCoursesQuery, {
+        replacements: { limit },
+        type: QueryTypes.SELECT,
+      });
+
+      if (!results.length) {
+        // Fallback to recent courses if no rated courses found
+        return this.findAll({
+          where: {
+            is_published: true,
+            is_approved: true,
+          },
+          include: [
+            {
+              model: User,
+              as: 'instructor',
+              attributes: ['id', 'name', 'profile_thumbnail'],
+            },
+          ],
+          limit,
+          order: [['created_at', 'DESC']],
+        });
+      }
+
+      // Create a map of ratings data by course ID
+      const ratingsMap = new Map();
+      results.forEach((row: any) => {
+        ratingsMap.set(row.id, {
+          avg_rating: row.avg_rating ? parseFloat(Number(row.avg_rating).toFixed(1)) : 0,
+          review_count: parseInt(row.review_count || '0'),
+        });
+      });
+
+      // Extract course IDs maintaining the order from the query
+      const courseIds = results.map((row: any) => row.id);
+
+      // Load full course data with their relationships
+      const courses = await this.findAll({
+        where: {
+          id: { [Op.in]: courseIds },
         },
-        {
-          model: Category,
-          as: 'categories',
-          attributes: ['id', 'name'],
-          through: { attributes: [] },
+        include: [
+          {
+            model: User,
+            as: 'instructor',
+            attributes: ['id', 'name', 'profile_thumbnail'],
+          },
+          {
+            model: Category,
+            as: 'categories',
+            attributes: ['id', 'name'],
+            through: { attributes: [] },
+          },
+        ],
+        // Preserve the order from our initial query
+        order: sequelize.literal(`FIELD(Course.id, ${courseIds.map(id => `'${id}'`).join(',')})`),
+      });
+
+      // Add rating information to each course
+      courses.forEach(course => {
+        const ratingInfo = ratingsMap.get(course.id);
+        if (ratingInfo) {
+          (course as any).dataValues.average_rating = ratingInfo.avg_rating;
+          (course as any).dataValues.review_count = ratingInfo.review_count;
+        }
+      });
+
+      return courses;
+    } catch (error) {
+      console.error('Error fetching featured courses:', error);
+      // Fallback in case of error
+      return this.findAll({
+        where: {
+          is_published: true,
+          is_approved: true,
         },
-      ],
-      limit,
-      order: [['created_at', 'DESC']],
-    });
+        include: [
+          {
+            model: User,
+            as: 'instructor',
+            attributes: ['id', 'name', 'profile_thumbnail'],
+          },
+        ],
+        limit,
+        order: [['created_at', 'DESC']],
+      });
+    }
   }
 
   /**

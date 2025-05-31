@@ -79,8 +79,8 @@ export class CategoryRepository extends BaseRepository<Category> {
 
     if (search) {
       whereClause[Op.or] = [
-        { name: { [Op.iLike]: `%${search}%` } },
-        { description: { [Op.iLike]: `%${search}%` } },
+        { name: { [Op.like]: `%${search}%` } },
+        { description: { [Op.like]: `%${search}%` } },
       ];
     }
 
@@ -350,8 +350,8 @@ export class CategoryRepository extends BaseRepository<Category> {
     return await this.findAll({
       where: {
         [Op.or]: [
-          { name: { [Op.iLike]: `%${searchTerm}%` } },
-          { description: { [Op.iLike]: `%${searchTerm}%` } },
+          { name: { [Op.like]: `%${searchTerm}%` } },
+          { description: { [Op.like]: `%${searchTerm}%` } },
         ],
       },
       include: [

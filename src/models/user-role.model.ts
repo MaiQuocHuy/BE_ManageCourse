@@ -35,7 +35,7 @@ class UserRole
 // Initialize UserRole model
 UserRole.init(
   {
-    id: {
+    id: { 
       type: DataTypes.INTEGER,
       autoIncrement: true,
       primaryKey: true,

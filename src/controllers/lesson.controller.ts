@@ -20,7 +20,7 @@ class LessonController {
   ): Promise<void> {
     console.log("Message", String(req.body.section_id));
     try {
-      const { title, type, is_free } = req.body;
+      const { title, type } = req.body;
       const section_id = req.query.section_id as string;
       const user_id = req.user!.id;
 
@@ -46,23 +46,21 @@ class LessonController {
 
           console.log(`Video duration extracted: ${videoDuration} seconds`);
         } catch (uploadError) {
-          console.error("Upload error:", uploadError);
-          return next(
-            new ApiError(500, "Failed to upload video to Cloudinary")
-          );
+          console.error('Upload error:', uploadError);
+          return next(new ApiError(500, 'Failed to upload video to Cloudinary'));
         }
       } else {
-        return next(new ApiError(400, "Video file is required"));
+        return next(new ApiError(400, 'Video file is required'));
       }
 
       // Create metadata object with video information
       const metadata: LessonMetadata = {
         public_id: videoPublicId,
         thumbnail_url: thumbnailUrl,
-        resource_type: "video",
-        format: req.file?.mimetype?.split("/")[1] || "mp4",
+        resource_type: 'video',
+        format: req.file?.mimetype?.split('/')[1] || 'mp4',
         created_at: new Date().toISOString(),
-        tags: ["video", "lesson"],
+        tags: ['video', 'lesson'],
       };
 
       console.log(`Creating lesson with metadata: ${JSON.stringify(metadata)}`);
@@ -75,7 +73,6 @@ class LessonController {
           type: (type as LessonType) || LessonType.VIDEO,
           content: videoContent,
           duration: videoDuration,
-          is_free: is_free === "true" || is_free === true,
           metadata, // Pass as object, service will handle conversion to JSON
         },
         user_id
@@ -101,12 +98,9 @@ class LessonController {
     try {
       const id = req.params.id;
       const user_id = req.user!.id;
-      const isAdmin = req.user!.roles.some(
-        (role: any) => role.role === Role.ADMIN
-      );
 
       // Check if user has access to this lesson
-      await lessonService.checkLessonAccess(id, user_id, isAdmin);
+      await lessonService.checkLessonAccess(id, user_id);
 
       const lesson = await lessonService.getLessonById(id);
 
@@ -175,11 +169,8 @@ class LessonController {
   ): Promise<void> {
     try {
       const id = req.params.id;
-      const { title, type, is_free } = req.body;
+      const { title, type } = req.body;
       const user_id = req.user!.id;
-      const isAdmin = req.user!.roles.some(
-        (role: any) => role.role === Role.ADMIN
-      );
 
       // Variables to store video information
       let videoContent: string | undefined = undefined;
@@ -194,7 +185,7 @@ class LessonController {
         try {
           currentMetadata = JSON.parse(currentLesson.metadata);
         } catch (e) {
-          console.error("Error parsing current metadata:", e);
+          console.error('Error parsing current metadata:', e);
         }
       }
 
@@ -219,9 +210,8 @@ class LessonController {
             ...newMetadata,
             public_id: uploadResult.public_id,
             thumbnail_url: uploadResult.thumbnail_url,
-            format:
-              uploadResult.format || req.file?.mimetype?.split("/")[1] || "mp4",
-            resource_type: "video",
+            format: uploadResult.format || req.file?.mimetype?.split('/')[1] || 'mp4',
+            resource_type: 'video',
             updated_at: new Date().toISOString(),
           } as LessonMetadata;
           metadataUpdated = true;
@@ -229,10 +219,8 @@ class LessonController {
           console.log(`Video duration extracted: ${videoDuration} seconds`);
           console.log(`Updated metadata with new video information`);
         } catch (uploadError) {
-          console.error("Upload error:", uploadError);
-          return next(
-            new ApiError(500, "Failed to upload video to Cloudinary")
-          );
+          console.error('Upload error:', uploadError);
+          return next(new ApiError(500, 'Failed to upload video to Cloudinary'));
         }
       }
 
@@ -243,16 +231,9 @@ class LessonController {
       if (type !== undefined) updateData.type = type as LessonType;
       if (videoContent !== undefined) updateData.content = videoContent;
       if (videoDuration !== undefined) updateData.duration = videoDuration;
-      if (is_free !== undefined)
-        updateData.is_free = is_free === "true" || is_free === true;
       if (metadataUpdated) updateData.metadata = JSON.stringify(newMetadata);
 
-      const lesson = await lessonService.updateLesson(
-        id,
-        updateData,
-        user_id,
-        isAdmin
-      );
+      const lesson = await lessonService.updateLesson(id, updateData, user_id);
 
       res.status(200).json({
         success: true,
@@ -374,18 +355,15 @@ class LessonController {
     try {
       const lesson_id = req.params.id;
       const user_id = req.user!.id;
-      const isAdmin = req.user!.roles.some(
-        (role: any) => role.role === Role.ADMIN
-      );
 
       // Check if user has access to this lesson
-      await lessonService.checkLessonAccess(lesson_id, user_id, isAdmin);
+      await lessonService.checkLessonAccess(lesson_id, user_id);
 
       await lessonService.markLessonCompleted(lesson_id, user_id);
 
       res.status(200).json({
         success: true,
-        message: "Lesson marked as completed",
+        message: 'Lesson marked as completed',
       });
     } catch (error) {
       next(error);
@@ -403,17 +381,11 @@ class LessonController {
     try {
       const lesson_id = req.params.id;
       const user_id = req.user!.id;
-      const isAdmin = req.user!.roles.some(
-        (role: any) => role.role === Role.ADMIN
-      );
 
       // Check if user has access to this lesson
-      await lessonService.checkLessonAccess(lesson_id, user_id, isAdmin);
+      await lessonService.checkLessonAccess(lesson_id, user_id);
 
-      const isCompleted = await lessonService.isLessonCompleted(
-        lesson_id,
-        user_id
-      );
+      const isCompleted = await lessonService.isLessonCompleted(lesson_id, user_id);
 
       res.status(200).json({
         success: true,
@@ -489,7 +461,7 @@ class LessonController {
       const user_id = req.user!.id;
 
       const nextLesson = await lessonService.getNextLesson(course_id, user_id);
-
+      console.log('nextLesson', nextLesson);
       res.status(200).json({
         success: true,
         data: nextLesson,

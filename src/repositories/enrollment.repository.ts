@@ -63,7 +63,7 @@ export class EnrollmentRepository extends BaseRepository<Enrollment> {
 
     let courseWhere: any = {};
     if (search) {
-      courseWhere.title = { [Op.iLike]: `%${search}%` };
+      courseWhere.title = { [Op.like]: `%${search}%` };
     }
 
     const { count, rows } = await this.findAndCountAll({
@@ -111,8 +111,8 @@ export class EnrollmentRepository extends BaseRepository<Enrollment> {
     let userWhere: any = {};
     if (search) {
       userWhere[Op.or] = [
-        { name: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } },
+        { name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
       ];
     }
 
@@ -156,8 +156,8 @@ export class EnrollmentRepository extends BaseRepository<Enrollment> {
 
     if (search) {
       userWhere[Op.or] = [
-        { name: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } },
+        { name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
       ];
     }
 
@@ -235,7 +235,10 @@ export class EnrollmentRepository extends BaseRepository<Enrollment> {
     const enrollments = await Enrollment.findAll({
       attributes: [
         'course_id',
-        [Enrollment.sequelize!.fn('COUNT', Enrollment.sequelize!.col('id')), 'enrollment_count'],
+        [
+          Enrollment.sequelize!.fn('COUNT', Enrollment.sequelize!.col('Enrollment.id')),
+          'enrollment_count',
+        ],
       ],
       include: [
         {
@@ -244,9 +247,11 @@ export class EnrollmentRepository extends BaseRepository<Enrollment> {
           attributes: ['id', 'title', 'thumbnail', 'price'],
         },
       ],
-      group: ['course_id', 'course.id'],
+      group: ['course_id', 'course.id', 'course.title', 'course.thumbnail', 'course.price'],
       order: [[Enrollment.sequelize!.literal('enrollment_count'), 'DESC']],
       limit,
+      raw: true,
+      nest: true,
     });
 
     return enrollments;

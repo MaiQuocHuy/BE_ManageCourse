@@ -67,9 +67,9 @@ const router = express.Router();
  *         description: Server error
  */
 router.post(
-  "/",
+  '/',
   authenticate,
-  authorize([Role.STUDENT]),
+  authorize([Role.STUDENT, Role.INSTRUCTOR]),
   validateRequest(createPaymentSchema),
   paymentController.createPayment
 );
@@ -113,7 +113,7 @@ router.post(
  *         description: Server error
  */
 router.get(
-  "/revenue/highest",
+  '/revenue/highest',
   validateRequest(getHighestRevenueCoursesSchema),
   paymentController.getHighestRevenueCourses
 );
@@ -137,7 +137,7 @@ router.get(
  *         description: Server error
  */
 router.get(
-  "/revenue/total",
+  '/revenue/total',
   authenticate,
   authorize([Role.ADMIN]),
   paymentController.getTotalRevenue
@@ -186,7 +186,7 @@ router.get(
  *         description: Server error
  */
 router.get(
-  "/revenue/time",
+  '/revenue/time',
   authenticate,
   authorize([Role.ADMIN]),
   validateRequest(getRevenueByTimeSchema),
@@ -198,6 +198,7 @@ router.get(
  * /api/payments/revenue/statistics:
  *   get:
  *     summary: Get revenue statistics
+ *     description: Admin can view overall statistics or for specific instructor. Instructor can only view their own statistics.
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -214,6 +215,11 @@ router.get(
  *           type: string
  *           format: date
  *         description: End date for filtering
+ *       - in: query
+ *         name: instructor_id
+ *         schema:
+ *           type: string
+ *         description: Instructor ID for filtering (admin only)
  *     responses:
  *       200:
  *         description: Revenue statistics
@@ -225,55 +231,11 @@ router.get(
  *         description: Server error
  */
 router.get(
-  "/revenue/statistics",
+  '/revenue/statistics',
   authenticate,
-  authorize([Role.ADMIN]),
+  authorize([Role.ADMIN, Role.INSTRUCTOR]),
   validateRequest(getRevenueStatisticsSchema),
   paymentController.getRevenueStatistics
-);
-
-/**
- * @swagger
- * /api/payments/instructor/{instructorId}/revenue:
- *   get:
- *     summary: Get instructor revenue
- *     tags: [Payments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: instructorId
- *         required: true
- *         schema:
- *           type: string
- *       - in: query
- *         name: start_date
- *         schema:
- *           type: string
- *           format: date
- *         description: Start date for filtering
- *       - in: query
- *         name: end_date
- *         schema:
- *           type: string
- *           format: date
- *         description: End date for filtering
- *     responses:
- *       200:
- *         description: Instructor revenue
- *       401:
- *         description: Not authenticated
- *       403:
- *         description: Not authorized
- *       500:
- *         description: Server error
- */
-router.get(
-  "/instructor/:instructorId/revenue",
-  authenticate,
-  authorize([Role.INSTRUCTOR, Role.ADMIN]),
-  validateRequest(getInstructorRevenueSchema),
-  paymentController.getInstructorRevenue
 );
 
 /**
@@ -281,6 +243,7 @@ router.get(
  * /api/payments/user:
  *   get:
  *     summary: Get all payments for the current user
+ *     description: Any authenticated user can view their own payment history
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -306,14 +269,14 @@ router.get(
  *         description: Payment status
  *     responses:
  *       200:
- *         description: List of payments
+ *         description: List of user's payments
  *       401:
  *         description: Not authenticated
  *       500:
  *         description: Server error
  */
 router.get(
-  "/user",
+  '/user',
   authenticate,
   validateRequest(getUserPaymentsSchema),
   paymentController.getUserPayments
@@ -363,7 +326,7 @@ router.get(
  *         description: Server error
  */
 router.get(
-  "/user/:userId",
+  '/user/:userId',
   authenticate,
   authorize([Role.ADMIN]),
   validateRequest(getUserPaymentsSchema),
@@ -419,7 +382,7 @@ router.get(
  *         description: Server error
  */
 router.get(
-  "/course/:courseId",
+  '/course/:courseId',
   authenticate,
   authorize([Role.INSTRUCTOR, Role.ADMIN]),
   validateRequest(getCoursePaymentsSchema),
@@ -453,7 +416,7 @@ router.get(
  *         description: Server error
  */
 router.get(
-  "/:id",
+  '/:id',
   authenticate,
   validateRequest(getPaymentSchema),
   paymentController.getPaymentById
@@ -500,7 +463,7 @@ router.get(
  */
 
 router.put(
-  "/:id/status",
+  '/:id/status',
   authenticate,
   authorize([Role.ADMIN]),
   validateRequest(updatePaymentStatusSchema),
@@ -551,6 +514,7 @@ router.put(
 router.post(
   "/:id/refund",
   authenticate,
+  authorize([Role.ADMIN]),
   validateRequest(processRefundSchema),
   paymentController.processRefund
 );

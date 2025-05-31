@@ -120,6 +120,8 @@ Category.init(
     tableName: 'categories',
     sequelize,
     timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     underscored: true,
     indexes: [
       {

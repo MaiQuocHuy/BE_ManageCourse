@@ -9,6 +9,7 @@ import Payment, { PaymentStatus } from '../models/payment.model';
 import Refund, { RefundStatus } from '../models/refund.model';
 import { ApiError } from '../utils/api-error';
 import sequelize from '../config/database';
+import { parsePeriodToDate } from '../utils/date';
 
 interface PaginationOptions {
   page?: number;
@@ -48,11 +49,6 @@ class PaymentService {
       const user = await userRepository.findById(user_id);
       if (!user) {
         throw new ApiError(404, 'User not found');
-      }
-
-      // Check if amount is enough
-      if (amount < course.price) {
-        throw new ApiError(400, 'Insufficient balance');
       }
 
       // Check if user is already enrolled in the course using repository
@@ -259,6 +255,21 @@ class PaymentService {
     return stats.totalRevenue;
   }
 
+  isPeriodInRange(period: string, startDate: Date, endDate: Date): boolean {
+    const periodDate = parsePeriodToDate(period);
+    if (!periodDate) return false;
+
+    // Nếu period là kiểu 'YYYY' thì cần xử lý đặc biệt
+    if (/^\d{4}$/.test(period)) {
+      const year = parseInt(period, 10);
+      const startYear = startDate.getFullYear();
+      const endYear = endDate.getFullYear();
+      return year >= startYear && year <= endYear;
+    }
+
+    return periodDate >= startDate && periodDate <= endDate;
+  }
+
   /**
    * Calculate revenue by time period
    */
@@ -271,10 +282,7 @@ class PaymentService {
 
     // Filter results by date range
     return results
-      .filter(result => {
-        const resultDate = new Date(result.period);
-        return resultDate >= startDate && resultDate <= endDate;
-      })
+      .filter(result => this.isPeriodInRange(result.period, startDate, endDate))
       .map(result => ({
         period: result.period,
         amount: Number(result.revenue),
@@ -286,7 +294,8 @@ class PaymentService {
    */
   async getRevenueStatistics(
     startDate?: Date,
-    endDate?: Date
+    endDate?: Date,
+    instructor_id?: string
   ): Promise<{
     total: number;
     average: number;
@@ -294,7 +303,8 @@ class PaymentService {
     transactions: number;
   }> {
     // Get payment statistics using repository
-    const stats = await paymentRepository.getPaymentStats();
+    const stats = await paymentRepository.getPaymentStats(instructor_id);
+    console.log('Stats', stats);
 
     // For growth calculation, we would need to implement date range filtering in repository
     // For now, return basic stats
@@ -326,9 +336,14 @@ class PaymentService {
   async getHighestRevenueCourses(
     options: PaginationOptions = {}
   ): Promise<{ courses: any[]; total: number; page: number; limit: number }> {
-    const { page = 1, limit = 10 } = options;
+    const { page = 1, limit = 10, start_date, end_date } = options;
 
-    const results = await paymentRepository.getTopEarningCourses(undefined, limit);
+    const results = await paymentRepository.getTopEarningCourses(
+      undefined,
+      limit,
+      start_date,
+      end_date
+    );
 
     return {
       courses: results,

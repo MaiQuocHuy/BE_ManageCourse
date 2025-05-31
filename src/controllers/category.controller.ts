@@ -141,7 +141,7 @@ class CategoryController {
       const category = await categoryService.updateCategory(id, {
         name,
         description,
-        parent_id,
+        parent_id: parent_id === '' ? null : parent_id,
         is_active,
       });
 
@@ -189,7 +189,7 @@ class CategoryController {
   }
 
   /**
-   * Associate a course with a category
+   * Associate a course with multiple categories
    */
   async associateCourseWithCategory(
     req: Request,
@@ -198,16 +198,23 @@ class CategoryController {
   ): Promise<void> {
     try {
       const course_id = req.params.courseId;
-      const { category_id } = req.body;
+      const { category_ids } = req.body;
+
+      // Ensure category_ids is an array
+      const categoryIdsArray = Array.isArray(category_ids) ? category_ids : [category_ids];
 
       await categoryService.associateCourseWithCategory({
         course_id,
-        category_id,
+        category_ids: categoryIdsArray,
       });
 
       res.status(200).json({
         success: true,
-        message: 'Course associated with category successfully',
+        message: `Course associated with ${categoryIdsArray.length} categories successfully`,
+        data: {
+          course_id,
+          category_ids: categoryIdsArray,
+        },
       });
     } catch (error) {
       next(error);
@@ -215,7 +222,63 @@ class CategoryController {
   }
 
   /**
-   * Disassociate a course from a category
+   * Disassociate a course from multiple categories
+   */
+  async disassociateCourseFromCategories(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const course_id = req.params.courseId;
+      const { category_ids } = req.body;
+
+      // Ensure category_ids is an array
+      const categoryIdsArray = Array.isArray(category_ids) ? category_ids : [category_ids];
+
+      await categoryService.disassociateCourseFromCategories(course_id, categoryIdsArray);
+
+      res.status(200).json({
+        success: true,
+        message: `Course disassociated from ${categoryIdsArray.length} categories successfully`,
+        data: {
+          course_id,
+          category_ids: categoryIdsArray,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Update course categories (replace all existing associations)
+   */
+  async updateCourseCategories(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const course_id = req.params.courseId;
+      const { category_ids } = req.body;
+
+      // Ensure category_ids is an array
+      const categoryIdsArray = Array.isArray(category_ids) ? category_ids : [category_ids];
+
+      await categoryService.updateCourseCategories(course_id, categoryIdsArray);
+
+      res.status(200).json({
+        success: true,
+        message: `Course categories updated successfully`,
+        data: {
+          course_id,
+          category_ids: categoryIdsArray,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Disassociate a course from a category (legacy method - kept for backward compatibility)
    */
   async disassociateCourseFromCategory(
     req: Request,

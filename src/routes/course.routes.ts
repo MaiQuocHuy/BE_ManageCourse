@@ -4,7 +4,7 @@ import { authenticate } from "../middleware/auth.middleware";
 import { authorize } from "../middleware/role.middleware";
 import { Role } from "../models/user-role.model";
 import { validateRequest } from "../middleware/validation.middleware";
-import { upload } from "../middleware/upload.middleware";
+import { upload, optionalFileUpload } from '../middleware/upload.middleware';
 import {
   createCourseSchema,
   updateCourseSchema,
@@ -15,16 +15,16 @@ import {
   searchCoursesSchema,
   getCoursesSchema,
   getRecommendedCoursesSchema,
-} from "../validators/course.validator";
+} from '../validators/course.validator';
 
 const router = express.Router();
 
-// Create a new course (instructor only)
+// Create a new course (instructor, admin only)
 /**
  * @swagger
  * /api/courses:
  *   post:
- *     summary: Create a new course (instructor only)
+ *     summary: Create a new course (instructor, admin only)
  *     tags: [Courses]
  *     security:
  *       - bearerAuth: []
@@ -66,10 +66,10 @@ const router = express.Router();
  *         description: Server error
  */
 router.post(
-  "/",
+  '/',
   authenticate,
   authorize([Role.INSTRUCTOR, Role.ADMIN]),
-  upload.single("thumbnail"),
+  upload.single('thumbnail'),
   validateRequest(createCourseSchema),
   courseController.createCourse
 );
@@ -113,220 +113,7 @@ router.post(
  *       500:
  *         description: Server error
  */
-router.get("/", validateRequest(getCoursesSchema), courseController.getCourses);
-
-// Get a course by ID
-/**
- * @swagger
- * /api/courses/{id}:
- *   get:
- *     summary: Get a course by ID
- *     tags: [Courses]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Course ID
- *     responses:
- *       200:
- *         description: Course details
- *       404:
- *         description: Course not found
- *       500:
- *         description: Server error
- */
-router.get(
-  "/:id",
-  validateRequest(getCourseSchema),
-  courseController.getCourseById
-);
-
-// Update a course (instructor only)
-/**
- * @swagger
- * /api/courses/{id}:
- *   put:
- *     summary: Update a course  (instructor only)
- *     tags: [Courses]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Course ID
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               title:
- *                 type: string
- *               description:
- *                 type: string
- *               price:
- *                 type: number
- *               thumbnail:
- *                 type: string
- *                 format: binary
- *               is_published:
- *                 type: boolean
- *               categories:
- *                 type: array
- *                 items:
- *                   type: string
- *                   description: Category ID
- *                 description: Comma-separated list of category IDs
- *     responses:
- *       200:
- *         description: Course updated successfully
- *       400:
- *         description: Invalid input
- *       403:
- *         description: Not authorized
- *       404:
- *         description: Course not found
- *       500:
- *         description: Server error
- */
-router.put(
-  "/:id",
-  authenticate,
-  authorize([Role.INSTRUCTOR, Role.ADMIN]),
-  upload.single("thumbnail"),
-  validateRequest(updateCourseSchema),
-  courseController.updateCourse
-);
-
-// Delete a course (instructor only)
-/**
- * @swagger
- * /api/courses/{id}:
- *   delete:
- *     summary: Delete a course (instructor only)
- *     tags: [Courses]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Course ID
- *     responses:
- *       200:
- *         description: Course deleted successfully
- *       403:
- *         description: Not authorized
- *       404:
- *         description: Course not found
- *       500:
- *         description: Server error
- */
-router.delete(
-  "/:id",
-  authenticate,
-  authorize([Role.INSTRUCTOR, Role.ADMIN]),
-  validateRequest(getCourseSchema),
-  courseController.deleteCourse
-);
-
-// Approve a course (admin only)
-/**
- * @swagger
- * /api/courses/{id}/approve:
- *   patch:
- *     summary: Approve a course (admin only)
- *     tags: [Courses]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Course ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               is_approved:
- *                 type: boolean
- *             required:
- *               - is_approved
- *     responses:
- *       200:
- *         description: Course approval status updated
- *       403:
- *         description: Not authorized
- *       404:
- *         description: Course not found
- *       500:
- *         description: Server error
- */
-router.patch(
-  "/:id/approve",
-  authenticate,
-  authorize([Role.ADMIN]),
-  validateRequest(approveCourseSchema),
-  courseController.approveCourse
-);
-
-// Update course publication status (instructor only)
-/**
- * @swagger
- * /api/courses/{id}/status:
- *   patch:
- *     summary: Update course publication status (instructor only)
- *     tags: [Courses]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Course ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               is_published:
- *                 type: boolean
- *             required:
- *               - is_published
- *     responses:
- *       200:
- *         description: Course publication status updated
- *       403:
- *         description: Not authorized
- *       404:
- *         description: Course not found
- *       500:
- *         description: Server error
- */
-router.patch(
-  "/:id/status",
-  authenticate,
-  authorize([Role.INSTRUCTOR, Role.ADMIN]),
-  validateRequest(updateCourseStatusSchema),
-  courseController.updateCourseStatus
-);
+router.get('/', validateRequest(getCoursesSchema), courseController.getCourses);
 
 // Get all courses for moderation (admin only)
 /**
@@ -348,6 +135,12 @@ router.patch(
  *         schema:
  *           type: integer
  *         description: Number of items per page
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, published, draft, approved]
+ *         description: Filter courses by status
  *     responses:
  *       200:
  *         description: List of courses for moderation
@@ -357,38 +150,94 @@ router.patch(
  *         description: Server error
  */
 router.get(
-  "/moderation",
+  '/moderation',
   authenticate,
   authorize([Role.ADMIN]),
   courseController.getAllCoursesForModeration
 );
 
-// Get categories for a course
+// Search courses by keyword
 /**
  * @swagger
- * /api/courses/{id}/categories:
+ * /api/courses/search:
  *   get:
- *     summary: Get categories for a course
+ *     summary: Search courses by keyword
  *     tags: [Courses]
  *     parameters:
- *       - in: path
- *         name: id
+ *       - in: query
+ *         name: keyword
  *         required: true
  *         schema:
  *           type: string
- *         description: Course ID
+ *         description: Search keyword
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Number of items per page
+ *       - in: query
+ *         name: category_id
+ *         schema:
+ *           type: string
+ *         description: Filter by category ID
+ *       - in: query
+ *         name: is_published
+ *         schema:
+ *           type: boolean
+ *         description: Filter by publication status
+ *       - in: query
+ *         name: is_approved
+ *         schema:
+ *           type: boolean
+ *         description: Filter by approved status
  *     responses:
  *       200:
- *         description: List of categories for the course
- *       404:
- *         description: Course not found
+ *         description: Search results
+ *       400:
+ *         description: Invalid input
+ *       500:
+ *         description: Server error
+ */
+router.get('/search', validateRequest(searchCoursesSchema), courseController.searchCourses);
+
+// Get recommended courses for a user
+/**
+ * @swagger
+ * /api/courses/recommended:
+ *   get:
+ *     summary: Get recommended courses for a user
+ *     tags: [Courses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Number of items per page
+ *     responses:
+ *       200:
+ *         description: List of recommended courses
+ *       403:
+ *         description: Not authorized
  *       500:
  *         description: Server error
  */
 router.get(
-  "/:id/categories",
-  validateRequest(getCourseSchema),
-  courseController.getCourseCategories
+  '/recommended',
+  authenticate,
+  validateRequest(getRecommendedCoursesSchema),
+  courseController.getRecommendedCourses
 );
 
 // Get courses by instructor ID
@@ -434,92 +283,246 @@ router.get(
  *         description: Server error
  */
 router.get(
-  "/instructor/:instructorId",
+  '/instructor/:instructorId',
   validateRequest(getCoursesByInstructorSchema),
   courseController.getCoursesByInstructorId
 );
 
-// Search courses by keyword
+// Get a course by ID
 /**
  * @swagger
- * /api/courses/search:
+ * /api/courses/{id}:
  *   get:
- *     summary: Search courses by keyword
+ *     summary: Get a course by ID
  *     tags: [Courses]
  *     parameters:
- *       - in: query
- *         name: keyword
+ *       - in: path
+ *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: Search keyword
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *         description: Page number
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *         description: Number of items per page
- *       - in: query
- *         name: category_id
- *         schema:
- *           type: string
- *         description: Filter by category ID
- *       - in: query
- *         name: is_published
- *         schema:
- *           type: boolean
- *         description: Filter by publication status
+ *         description: Course ID
  *     responses:
  *       200:
- *         description: Search results
- *       400:
- *         description: Invalid input
+ *         description: Course details
+ *       404:
+ *         description: Course not found
  *       500:
  *         description: Server error
  */
-router.get(
-  "/search",
-  validateRequest(searchCoursesSchema),
-  courseController.searchCourses
-);
+router.get('/:id', validateRequest(getCourseSchema), courseController.getCourseById);
 
-// Get recommended courses for a user
+// Update a course (instructor only)
 /**
  * @swagger
- * /api/courses/recommended:
- *   get:
- *     summary: Get recommended courses for a user
+ * /api/courses/{id}:
+ *   put:
+ *     summary: Update a course  (instructor only)
  *     tags: [Courses]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: page
+ *       - in: path
+ *         name: id
+ *         required: true
  *         schema:
- *           type: integer
- *         description: Page number
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *         description: Number of items per page
+ *           type: string
+ *         description: Course ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               price:
+ *                 type: number
+ *               thumbnail:
+ *                 type: string
+ *                 format: binary
+ *               is_published:
+ *                 type: boolean
+ *               categoryIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   description: Category ID
+ *                 description: Comma-separated list of category IDs
  *     responses:
  *       200:
- *         description: List of recommended courses
+ *         description: Course updated successfully
+ *       400:
+ *         description: Invalid input
  *       403:
  *         description: Not authorized
+ *       404:
+ *         description: Course not found
+ *       500:
+ *         description: Server error
+ */
+router.put(
+  '/:id',
+  authenticate,
+  authorize([Role.INSTRUCTOR, Role.ADMIN]),
+  optionalFileUpload('thumbnail'),
+  validateRequest(updateCourseSchema),
+  courseController.updateCourse
+);
+
+// Delete a course (instructor only)
+/**
+ * @swagger
+ * /api/courses/{id}:
+ *   delete:
+ *     summary: Delete a course (instructor only)
+ *     tags: [Courses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Course ID
+ *     responses:
+ *       200:
+ *         description: Course deleted successfully
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Course not found
+ *       500:
+ *         description: Server error
+ */
+router.delete(
+  '/:id',
+  authenticate,
+  authorize([Role.INSTRUCTOR, Role.ADMIN]),
+  validateRequest(getCourseSchema),
+  courseController.deleteCourse
+);
+
+// Get categories for a course
+/**
+ * @swagger
+ * /api/courses/{id}/categories:
+ *   get:
+ *     summary: Get categories for a course
+ *     tags: [Courses]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Course ID
+ *     responses:
+ *       200:
+ *         description: List of categories for the course
+ *       404:
+ *         description: Course not found
  *       500:
  *         description: Server error
  */
 router.get(
-  "/recommended",
+  '/:id/categories',
+  validateRequest(getCourseSchema),
+  courseController.getCourseCategories
+);
+
+// Approve a course (admin only)
+/**
+ * @swagger
+ * /api/courses/{id}/approve:
+ *   patch:
+ *     summary: Approve a course (admin only)
+ *     tags: [Courses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Course ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               is_approved:
+ *                 type: boolean
+ *             required:
+ *               - is_approved
+ *     responses:
+ *       200:
+ *         description: Course approval status updated
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Course not found
+ *       500:
+ *         description: Server error
+ */
+router.patch(
+  '/:id/approve',
   authenticate,
-  validateRequest(getRecommendedCoursesSchema),
-  courseController.getRecommendedCourses
+  authorize([Role.ADMIN]),
+  validateRequest(approveCourseSchema),
+  courseController.approveCourse
+);
+
+// Update course publication status (instructor only)
+/**
+ * @swagger
+ * /api/courses/{id}/status:
+ *   patch:
+ *     summary: Update course publication status (instructor only)
+ *     tags: [Courses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Course ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               is_published:
+ *                 type: boolean
+ *             required:
+ *               - is_published
+ *     responses:
+ *       200:
+ *         description: Course publication status updated
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Course not found
+ *       500:
+ *         description: Server error
+ */
+router.patch(
+  '/:id/status',
+  authenticate,
+  authorize([Role.INSTRUCTOR]),
+  validateRequest(updateCourseStatusSchema),
+  courseController.updateCourseStatus
 );
 
 export default router;

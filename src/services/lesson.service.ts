@@ -30,7 +30,6 @@ export interface LessonCreateData {
   type: LessonType;
   content?: string;
   duration?: number;
-  is_free?: boolean;
   metadata?: LessonMetadata | string; // Can accept object or JSON string
 }
 
@@ -39,7 +38,6 @@ export interface LessonUpdateData {
   type?: LessonType;
   content?: string;
   duration?: number;
-  is_free?: boolean;
   metadata?: LessonMetadata | string; // Can accept object or JSON string
 }
 
@@ -63,6 +61,7 @@ class LessonService {
     }
 
     const course = section.get('course') as any;
+    console.warn('course', course.instructor_id, user_id);
     if (course.instructor_id !== user_id) {
       throw new ApiError(403, 'You are not authorized to manage lessons for this section');
     }
@@ -74,7 +73,7 @@ class LessonService {
    * Create a new lesson
    */
   async createLesson(data: LessonCreateData, user_id: string): Promise<Lesson> {
-    const { section_id, title, type, content, duration, is_free, metadata } = data;
+    const { section_id, title, type, content, duration, metadata } = data;
 
     let transaction: Transaction | null = null;
 
@@ -118,7 +117,6 @@ class LessonService {
           content: content || null,
           duration: duration || null,
           order_index,
-          is_free: is_free !== undefined ? is_free : false,
           metadata: metadataString,
         },
         { transaction }
@@ -170,15 +168,20 @@ class LessonService {
    * Check if user has access to a lesson
    * @param lesson_id - The ID of the lesson
    * @param user_id - The ID of the user
-   * @param isAdmin - Whether the user is an admin
    * @returns True if has access, throws error if not
    */
-  async checkLessonAccess(
-    lesson_id: string,
-    user_id: string,
-    isAdmin: boolean = false
-  ): Promise<boolean> {
+  async checkLessonAccess(lesson_id: string, user_id: string): Promise<boolean> {
     // For now, return true - implement access logic as needed
+    // TODO: Implement access logic as needed
+    const lesson = await lessonRepository.findWithDetails(lesson_id);
+    if (!lesson) {
+      throw new ApiError(404, 'Lesson not found');
+    }
+    const section = lesson.get('section') as any;
+    const course = section.get('course') as any;
+    if (course.instructor_id !== user_id) {
+      throw new ApiError(403, 'You are not authorized to access this lesson');
+    }
     return true;
   }
 
@@ -208,22 +211,15 @@ class LessonService {
   /**
    * Update a lesson
    */
-  async updateLesson(
-    id: string,
-    data: LessonUpdateData,
-    user_id: string,
-    isAdmin: boolean = false
-  ): Promise<Lesson> {
-    const { title, type, content, duration, is_free, metadata } = data;
+  async updateLesson(id: string, data: LessonUpdateData, user_id: string): Promise<Lesson> {
+    const { title, type, content, duration, metadata } = data;
 
     // Get the lesson
     const lesson = await this.getLessonById(id);
 
     // Check if user is authorized to update the lesson
-    if (!isAdmin) {
-      const section = lesson.get('section') as any;
-      await this.checkSectionOwnership(section.id, user_id);
-    }
+    const section = lesson.get('section') as any;
+    await this.checkSectionOwnership(section.id, user_id);
 
     let transaction: Transaction | null = null;
 
@@ -238,7 +234,6 @@ class LessonService {
       if (type !== undefined) updateData.type = type;
       if (content !== undefined) updateData.content = content;
       if (duration !== undefined) updateData.duration = duration;
-      if (is_free !== undefined) updateData.is_free = is_free;
 
       // Process metadata if provided
       if (metadata !== undefined) {
@@ -450,7 +445,7 @@ class LessonService {
   async getNextLesson(course_id: string, user_id: string): Promise<Lesson | null> {
     // Get all lessons for the course with completion status
     const lessonsWithStatus = await lessonRepository.findWithCompletionStatus(course_id, user_id);
-
+    console.log('lessonsWithStatus', lessonsWithStatus);
     // Find the first uncompleted lesson
     for (const lesson of lessonsWithStatus) {
       const completions = lesson.get('completions') as any[];

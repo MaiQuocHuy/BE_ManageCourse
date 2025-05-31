@@ -17,7 +17,6 @@ interface LessonAttributes {
   content: string | null;
   duration: number | null;
   order_index: number;
-  is_free: boolean;
   metadata: string | null; // JSON string for storing additional data like Cloudinary public_id
   created_at?: Date;
   updated_at?: Date;
@@ -27,21 +26,11 @@ interface LessonAttributes {
 interface LessonCreationAttributes
   extends Optional<
     LessonAttributes,
-    | "id"
-    | "created_at"
-    | "updated_at"
-    | "content"
-    | "duration"
-    | "order_index"
-    | "is_free"
-    | "metadata"
+    'id' | 'created_at' | 'updated_at' | 'content' | 'duration' | 'order_index' | 'metadata'
   > {}
 
 // Lesson model class
-class Lesson
-  extends Model<LessonAttributes, LessonCreationAttributes>
-  implements LessonAttributes
-{
+class Lesson extends Model<LessonAttributes, LessonCreationAttributes> implements LessonAttributes {
   public id!: string;
   public section_id!: string;
   public title!: string;
@@ -49,7 +38,6 @@ class Lesson
   public content!: string | null;
   public duration!: number | null;
   public order_index!: number;
-  public is_free!: boolean;
   public metadata!: string | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
@@ -58,16 +46,16 @@ class Lesson
   public static associate(models: any): void {
     // Lesson belongs to Section
     Lesson.belongsTo(models.Section, {
-      foreignKey: "section_id",
-      as: "section",
-      onDelete: "CASCADE",
+      foreignKey: 'section_id',
+      as: 'section',
+      onDelete: 'CASCADE',
     });
 
     // Lesson has many LessonCompletions
     Lesson.hasMany(models.LessonCompletion, {
-      foreignKey: "lesson_id",
-      as: "completions",
-      onDelete: "CASCADE",
+      foreignKey: 'lesson_id',
+      as: 'completions',
+      onDelete: 'CASCADE',
     });
   }
 }
@@ -113,11 +101,6 @@ Lesson.init(
       allowNull: false,
       defaultValue: 0,
     },
-    is_free: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false,
-    },
     metadata: {
       type: DataTypes.TEXT,
       allowNull: true,
@@ -148,10 +131,6 @@ Lesson.init(
       {
         fields: ['section_id', 'order_index'],
         name: 'lessons_section_order_idx',
-      },
-      {
-        fields: ['is_free'],
-        name: 'lessons_is_free_idx',
       },
       {
         fields: ['type'],

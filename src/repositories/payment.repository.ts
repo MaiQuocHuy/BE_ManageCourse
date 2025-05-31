@@ -3,6 +3,9 @@ import Payment from '../models/payment.model';
 import Course from '../models/course.model';
 import User from '../models/user.model';
 import { BaseRepository } from './base.repository';
+import { PaymentStatus } from '../models/payment.model';
+import sequelize from '../config/database';
+import { getPaymentCount } from '../utils/paymentStatsHelper';
 
 interface PaginationOptions {
   page?: number;
@@ -87,7 +90,7 @@ export class PaymentRepository extends BaseRepository<Payment> {
       ],
       limit,
       offset,
-      order: [['payment_date', 'DESC']],
+      order: [['created_at', 'DESC']],
     });
 
     return {
@@ -115,13 +118,13 @@ export class PaymentRepository extends BaseRepository<Payment> {
     }
 
     if (start_date && end_date) {
-      whereClause.payment_date = {
+      whereClause.created_at = {
         [Op.between]: [start_date, end_date],
       };
     } else if (start_date) {
-      whereClause.payment_date = { [Op.gte]: start_date };
+      whereClause.created_at = { [Op.gte]: start_date };
     } else if (end_date) {
-      whereClause.payment_date = { [Op.lte]: end_date };
+      whereClause.created_at = { [Op.lte]: end_date };
     }
 
     const { count, rows } = await this.findAndCountAll({
@@ -141,7 +144,7 @@ export class PaymentRepository extends BaseRepository<Payment> {
       ],
       limit,
       offset,
-      order: [['payment_date', 'DESC']],
+      order: [['created_at', 'DESC']],
     });
 
     return {
@@ -160,6 +163,7 @@ export class PaymentRepository extends BaseRepository<Payment> {
   ): Promise<{ payments: Payment[]; total: number; page: number; limit: number }> {
     const { page = 1, limit = 10, search, status, payment_method, start_date, end_date } = options;
     const offset = (page - 1) * limit;
+    console.log("Checking")
 
     let whereClause: any = {};
 
@@ -172,13 +176,13 @@ export class PaymentRepository extends BaseRepository<Payment> {
     }
 
     if (start_date && end_date) {
-      whereClause.payment_date = {
+      whereClause.created_at = {
         [Op.between]: [start_date, end_date],
       };
     } else if (start_date) {
-      whereClause.payment_date = { [Op.gte]: start_date };
+      whereClause.created_at = { [Op.gte]: start_date };
     } else if (end_date) {
-      whereClause.payment_date = { [Op.lte]: end_date };
+      whereClause.created_at = { [Op.lte]: end_date };
     }
 
     let userWhere: any = {};
@@ -186,10 +190,9 @@ export class PaymentRepository extends BaseRepository<Payment> {
 
     if (search) {
       userWhere[Op.or] = [
-        { name: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } },
+        { name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
       ];
-      courseWhere.title = { [Op.iLike]: `%${search}%` };
     }
 
     const { count, rows } = await this.findAndCountAll({
@@ -210,7 +213,7 @@ export class PaymentRepository extends BaseRepository<Payment> {
       ],
       limit,
       offset,
-      order: [['payment_date', 'DESC']],
+      order: [['created_at', 'DESC']],
     });
 
     return {
@@ -242,13 +245,9 @@ export class PaymentRepository extends BaseRepository<Payment> {
     pendingPayments: number;
     failedPayments: number;
     recentPayments: number;
+    recentRevenue: number;
   }> {
-    let whereClause: any = {};
-    let courseWhere: any = {};
-
-    if (instructor_id) {
-      courseWhere.instructor_id = instructor_id;
-    }
+    const courseWhere: any = instructor_id ? { instructor_id } : {};
 
     const includeOptions = instructor_id
       ? [
@@ -261,44 +260,61 @@ export class PaymentRepository extends BaseRepository<Payment> {
         ]
       : [];
 
-    const [totalPayments, successfulPayments, pendingPayments, failedPayments, recentPayments] =
-      await Promise.all([
-        this.count({
-          include: includeOptions,
-        }),
-        this.count({
-          where: { status: 'completed' },
-          include: includeOptions,
-        }),
-        this.count({
-          where: { status: 'pending' },
-          include: includeOptions,
-        }),
-        this.count({
-          where: { status: 'failed' },
-          include: includeOptions,
-        }),
-        this.count({
-          where: {
-            payment_date: {
-              [Op.gte]: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
-            },
-          },
-          include: includeOptions,
-        }),
-      ]);
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // Last 30 days
 
-    // Calculate total revenue
-    const revenueResult = await Payment.findOne({
-      attributes: [
-        [Payment.sequelize!.fn('SUM', Payment.sequelize!.col('amount')), 'totalRevenue'],
-      ],
-      where: { status: 'completed' },
-      include: includeOptions,
-      raw: true,
-    });
+    const notRefundedStatus = {
+      status: {
+        [Op.ne]: 'refunded',
+      },
+    };
+
+    const [
+      totalPayments,
+      successfulPayments,
+      pendingPayments,
+      failedPayments,
+      recentPayments,
+      revenueResult,
+      recentRevenueResult,
+    ] = await Promise.all([
+      getPaymentCount(notRefundedStatus, instructor_id),
+      getPaymentCount({ status: 'completed' }, instructor_id),
+      getPaymentCount({ status: 'pending' }, instructor_id),
+      getPaymentCount({ status: 'failed' }, instructor_id),
+      getPaymentCount(
+        { ...notRefundedStatus, created_at: { [Op.gte]: thirtyDaysAgo } },
+        instructor_id
+      ),
+
+      Payment.findOne({
+        attributes: [
+          [Payment.sequelize!.fn('SUM', Payment.sequelize!.col('amount')), 'totalRevenue'],
+        ],
+        where: {
+          ...notRefundedStatus,
+          status: 'completed',
+        },
+        include: includeOptions,
+        raw: true,
+      }),
+
+      Payment.findOne({
+        attributes: [
+          [Payment.sequelize!.fn('SUM', Payment.sequelize!.col('amount')), 'recentRevenue'],
+        ],
+        where: {
+          ...notRefundedStatus,
+          status: 'completed',
+          created_at: { [Op.gte]: thirtyDaysAgo },
+        },
+        include: includeOptions,
+        raw: true,
+      }),
+    ]);
 
     const totalRevenue = parseFloat((revenueResult as any)?.totalRevenue || '0');
+    const recentRevenue = parseFloat((recentRevenueResult as any)?.recentRevenue || '0');
 
     return {
       totalPayments,
@@ -307,6 +323,7 @@ export class PaymentRepository extends BaseRepository<Payment> {
       pendingPayments,
       failedPayments,
       recentPayments,
+      recentRevenue,
     };
   }
 
@@ -319,46 +336,44 @@ export class PaymentRepository extends BaseRepository<Payment> {
     limit: number = 30
   ): Promise<any[]> {
     let dateFormat: string;
-    let dateInterval: string;
 
     switch (period) {
       case 'day':
         dateFormat = '%Y-%m-%d';
-        dateInterval = '1 day';
         break;
       case 'week':
         dateFormat = '%Y-%u';
-        dateInterval = '1 week';
         break;
       case 'month':
         dateFormat = '%Y-%m';
-        dateInterval = '1 month';
         break;
       case 'year':
         dateFormat = '%Y';
-        dateInterval = '1 year';
         break;
       default:
         dateFormat = '%Y-%m-%d';
-        dateInterval = '1 day';
     }
 
-    let whereClause: any = { status: 'completed' };
-    let includeOptions: any[] = [];
+    const whereClause: any = {
+      status: PaymentStatus.COMPLETED,
+    };
+
+    const includeOptions: any[] = [];
 
     if (instructor_id) {
       includeOptions.push({
         model: Course,
         as: 'course',
-        where: { instructor_id },
         attributes: [],
+        where: { instructor_id },
+        required: true,
       });
     }
 
     return await Payment.findAll({
       attributes: [
         [
-          Payment.sequelize!.fn('DATE_FORMAT', Payment.sequelize!.col('payment_date'), dateFormat),
+          Payment.sequelize!.fn('DATE_FORMAT', Payment.sequelize!.col('created_at'), dateFormat),
           'period',
         ],
         [Payment.sequelize!.fn('SUM', Payment.sequelize!.col('amount')), 'revenue'],
@@ -367,7 +382,7 @@ export class PaymentRepository extends BaseRepository<Payment> {
       where: whereClause,
       include: includeOptions,
       group: [
-        Payment.sequelize!.fn('DATE_FORMAT', Payment.sequelize!.col('payment_date'), dateFormat),
+        Payment.sequelize!.fn('DATE_FORMAT', Payment.sequelize!.col('created_at'), dateFormat),
       ],
       order: [[Payment.sequelize!.literal('period'), 'DESC']],
       limit,
@@ -377,33 +392,81 @@ export class PaymentRepository extends BaseRepository<Payment> {
 
   /**
    * Get top earning courses
+   * @param instructor_id Optional instructor ID to filter by
+   * @param limit Number of courses to return
+   * @param start_date Start date for revenue calculation
+   * @param end_date End date for revenue calculation
+   * @returns Array of courses with revenue information
    */
-  async getTopEarningCourses(instructor_id?: string, limit: number = 10): Promise<any[]> {
-    let whereClause: any = { status: 'completed' };
-    let courseWhere: any = {};
+  async getTopEarningCourses(
+    instructor_id?: string,
+    limit: number = 10,
+    start_date?: Date,
+    end_date?: Date
+  ): Promise<any[]> {
+    // Build where clause for payment conditions
+    const whereClause: any = {
+      status: PaymentStatus.COMPLETED,
+    };
 
-    if (instructor_id) {
-      courseWhere.instructor_id = instructor_id;
+    // Add date range filter if both dates are provided
+    if (start_date && end_date) {
+      whereClause.created_at = {
+        [Op.between]: [start_date, end_date],
+      };
     }
 
-    return await Payment.findAll({
-      attributes: [
-        'course_id',
-        [Payment.sequelize!.fn('SUM', Payment.sequelize!.col('amount')), 'total_revenue'],
-        [Payment.sequelize!.fn('COUNT', Payment.sequelize!.col('Payment.id')), 'sales_count'],
-      ],
-      where: whereClause,
+    // Build course include with filter if needed
+    const courseInclude: any = {
+      model: Course,
+      as: 'course',
+      attributes: ['id', 'title', 'thumbnail', 'price'],
       include: [
         {
-          model: Course,
-          as: 'course',
-          where: Object.keys(courseWhere).length > 0 ? courseWhere : undefined,
-          attributes: ['id', 'title', 'thumbnail', 'price'],
+          model: User,
+          as: 'instructor',
+          attributes: ['id', 'name'],
+          required: false,
         },
       ],
-      group: ['course_id', 'course.id'],
-      order: [[Payment.sequelize!.literal('total_revenue'), 'DESC']],
+    };
+
+    // Add instructor filter if provided
+    if (instructor_id) {
+      courseInclude.where = { instructor_id };
+    }
+
+    // Execute optimized query
+    const results = await Payment.findAll({
+      attributes: [
+        'course_id',
+        [sequelize.fn('SUM', sequelize.col('amount')), 'total_revenue'],
+        [sequelize.fn('COUNT', sequelize.col('Payment.id')), 'sales_count'],
+      ],
+      where: whereClause,
+      include: [courseInclude],
+      group: ['course_id', 'course.id', 'course.instructor.id'],
+      order: [[sequelize.literal('total_revenue'), 'DESC']],
       limit,
+      subQuery: false, // Improve performance by avoiding subqueries
+      raw: false,
+    });
+
+    // Transform results to ensure consistent format
+    return results.map((result: any) => {
+      const plainResult = result.get({ plain: true });
+
+      // Format revenue as number
+      if (plainResult.total_revenue) {
+        plainResult.total_revenue = parseFloat(plainResult.total_revenue);
+      }
+
+      // Format sales count as integer
+      if (plainResult.sales_count) {
+        plainResult.sales_count = parseInt(plainResult.sales_count.toString(), 10);
+      }
+
+      return plainResult;
     });
   }
 
@@ -427,7 +490,7 @@ export class PaymentRepository extends BaseRepository<Payment> {
     return await this.findAll({
       where: {
         status: 'completed',
-        payment_date: { [Op.gte]: refundDeadline },
+        created_at: { [Op.gte]: refundDeadline },
       },
       include: [
         {

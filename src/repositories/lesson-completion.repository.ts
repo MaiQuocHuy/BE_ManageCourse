@@ -43,7 +43,7 @@ export class LessonCompletionRepository extends BaseRepository<LessonCompletion>
 
     let lessonWhere: any = {};
     if (search) {
-      lessonWhere.title = { [Op.iLike]: `%${search}%` };
+      lessonWhere.title = { [Op.like]: `%${search}%` };
     }
 
     const { count, rows } = await this.findAndCountAll({

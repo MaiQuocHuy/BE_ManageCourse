@@ -3,11 +3,14 @@ import { Role } from '../models/user-role.model';
 import { ApiError } from '../utils/api-error';
 import { uploadToCloudinary } from '../utils/upload';
 import userService from '../services/user.service';
+import { DeviceInfo } from '../models/refresh-token.model';
+
 class UserController {
   // Register a new user
   async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { name, email, password } = req.body;
+      const deviceInfo: DeviceInfo = (req as any).deviceInfo;
 
       const user = await userService.createUser({
         name,
@@ -16,7 +19,7 @@ class UserController {
       });
 
       // Generate tokens for immediate login
-      const { accessToken, refreshToken } = await userService.login(email, password);
+      const { accessToken, refreshToken } = await userService.login(email, password, deviceInfo);
 
       res.status(201).json({
         success: true,
@@ -39,8 +42,13 @@ class UserController {
   async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { email, password } = req.body;
+      const deviceInfo: DeviceInfo = (req as any).deviceInfo;
 
-      const { accessToken, refreshToken, user } = await userService.login(email, password);
+      const { accessToken, refreshToken, user } = await userService.login(
+        email,
+        password,
+        deviceInfo
+      );
 
       res.status(200).json({
         success: true,
@@ -61,41 +69,145 @@ class UserController {
     }
   }
 
-  // Logout user
+  // Logout user from current device (enhanced with JTI)
   async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { refreshToken } = req.body;
+      const userId = req.user!.id;
+      const jti = req.user!.jti; // Get JTI from authenticated user
 
-      if (!refreshToken) {
-        throw new ApiError(400, 'Refresh token is required');
+      if (refreshToken) {
+        // If refresh token provided, logout that specific session
+        await userService.logout(refreshToken, jti);
+        res.status(200).json({
+          success: true,
+          message: 'Logged out from current device successfully',
+        });
+      } else if (jti) {
+        // If JTI available, logout by JTI (access token based logout)
+        await userService.logoutDeviceByJti(userId, jti);
+        res.status(200).json({
+          success: true,
+          message: 'Access token revoked successfully',
+        });
+      } else {
+        // Fallback: logout all devices for security
+        await userService.logoutAllDevices(userId);
+        res.status(200).json({
+          success: true,
+          message: 'Logged out from all devices successfully (token version updated)',
+        });
       }
+    } catch (error) {
+      next(error);
+    }
+  }
 
-      await userService.logout(refreshToken);
+  // Logout user from all devices (enhanced with JTI cleanup)
+  async logoutAllDevices(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.id;
+
+      await userService.logoutAllDevices(userId);
 
       res.status(200).json({
         success: true,
-        message: 'Logged out successfully',
+        message: 'Logged out from all devices successfully - all tokens invalidated',
       });
     } catch (error) {
       next(error);
     }
   }
 
-  // Refresh access token
+  // Logout from specific device by JTI
+  async logoutDeviceByJti(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.id;
+      const { jti } = req.params;
+
+      await userService.logoutDeviceByJti(userId, jti);
+
+      res.status(200).json({
+        success: true,
+        message: 'Device session terminated successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Logout from specific device by refresh token ID
+  async logoutDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.id;
+      const { tokenId } = req.params;
+
+      await userService.logoutDevice(userId, parseInt(tokenId));
+
+      res.status(200).json({
+        success: true,
+        message: 'Device logged out successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get active sessions (enhanced with JTI data)
+  async getActiveSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.id;
+      const currentJti = req.user!.jti; // Current session JTI
+
+      const sessions = await userService.getActiveSessions(userId, currentJti);
+
+      res.status(200).json({
+        success: true,
+        data: sessions,
+        meta: {
+          total: sessions.length,
+          current_jti: currentJti,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get token statistics (admin only)
+  async getTokenStats(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const stats = await userService.getTokenStats();
+
+      res.status(200).json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Refresh access token (enhanced with JTI)
   async refreshToken(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { refreshToken } = req.body;
+      const deviceInfo: DeviceInfo = (req as any).deviceInfo;
 
       if (!refreshToken) {
         throw new ApiError(400, 'Refresh token is required');
       }
 
-      const { accessToken, user } = await userService.refreshAccessToken(refreshToken);
+      const { accessToken, user, jti } = await userService.refreshAccessToken(
+        refreshToken,
+        deviceInfo
+      );
 
       res.status(200).json({
         success: true,
         data: {
           accessToken,
+          jti, // Include JTI in response for client tracking
           user: {
             id: user.id,
             name: user.name,

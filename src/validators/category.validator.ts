@@ -58,14 +58,47 @@ export const getCategoryBySlugSchema = Joi.object({
 // Associate course with category validation schema
 export const courseCategorySchema = Joi.object({
   body: Joi.object({
-    category_id: Joi.string().required(),
+    category_ids: Joi.array()
+      .items(Joi.string().trim().required())
+      .min(1)
+      .required()
+      .label('Category IDs'),
+  }).required(),
+
+  params: Joi.object({
+    courseId: Joi.string().required(),
+  }).required(),
+});
+
+// Bulk disassociate course from multiple categories validation schema
+export const disassociateCourseFromCategoriesSchema = Joi.object({
+  body: Joi.object({
+    category_ids: Joi.array()
+      .items(Joi.string().trim().required())
+      .min(1)
+      .required()
+      .label('Category IDs'),
   }).required(),
   params: Joi.object({
     courseId: Joi.string().required(),
   }).required(),
 });
 
-// Disassociate course from category validation schema
+// Update course categories validation schema
+export const updateCourseCategoriesSchema = Joi.object({
+  body: Joi.object({
+    category_ids: Joi.array()
+      .items(Joi.string().trim().required())
+      .min(1)
+      .required()
+      .label('Category IDs'),
+  }).required(),
+  params: Joi.object({
+    courseId: Joi.string().required(),
+  }).required(),
+});
+
+// Disassociate course from category validation schema (legacy single category)
 export const disassociateCourseSchema = Joi.object({
   body: Joi.object({
     category_id: Joi.string().required(),
